@@ -15,6 +15,19 @@ if(POLICY CMP0091)
     cmake_policy(SET CMP0091 NEW)
 endif()
 
+# Enable JSON compilation database generation
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Symbolic link to the compile_commands.json in root directory for tools
+if(CMAKE_EXPORT_COMPILE_COMMANDS)
+    add_custom_target(
+        create_compile_commands_symlink ALL
+        COMMAND ${CMAKE_COMMAND} -E create_symlink 
+            ${CMAKE_BINARY_DIR}/compile_commands.json
+            ${CMAKE_SOURCE_DIR}/compile_commands.json
+    )
+endif()
+
 if(WIN32 OR "${CMAKE_SYSTEM}" MATCHES "Windows")
     set(WINDOWS TRUE)
 endif()
