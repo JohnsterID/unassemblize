@@ -12,12 +12,9 @@
  */
 #pragma once
 
-// clang-format off
-#include <imgui_internal.h>
-#include <imgui.h>
-// clang-format on
-#include "utility/imgui_text_filter.h"
 #include "utility/imgui_misc.h"
+#include "utility/imgui_text_filter.h"
+#include <imgui.h>
 
 #include "filecontentstorage.h"
 #include "runnerasync.h"

@@ -21,14 +21,16 @@
 #include <iostream>
 #include <stdio.h>
 
-#ifdef WIN32
+#ifdef _WIN32
 #include "imguiclient/imguiwin32.h"
 #include <Windows.h>
+#else
+#include "imguiclient/imguiglfw.h"
 #endif
 
 void CreateConsole()
 {
-#ifdef WIN32
+#ifdef _WIN32
     if (::AllocConsole() == FALSE)
     {
         return;
@@ -333,13 +335,18 @@ int main(int argc, char **argv)
 
     if (g_options.gui)
     {
-#ifdef WIN32
+#if defined(_WIN32)
+        // Windows GUI implementation
         unassemblize::gui::ImGuiWin32 gui;
-        unassemblize::gui::ImGuiStatus status = gui.run(g_options);
-        return int(status);
+#elif defined(__APPLE__) || defined(__linux__)
+        // macOS and Linux GUI implementation using GLFW
+        unassemblize::gui::ImGuiGLFW gui;
 #else
+        // Unsupported platform
         gui_error = true;
 #endif
+        unassemblize::gui::ImGuiStatus status = gui.run(g_options);
+        return int(status);
     }
     else
     {

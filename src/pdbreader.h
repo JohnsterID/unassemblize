@@ -14,7 +14,7 @@
 
 #include "pdbreadertypes.h"
 
-#ifdef WIN32
+#ifdef _WIN32
 #define PDB_READER_WIN32
 #endif
 
