@@ -107,4 +107,16 @@ bool push_back_unique(Container &container, const Value &value)
     return true;
 }
 
+template<typename SharedMutex>
+class shared_lock_guard // Alias read_lock_guard
+{
+public:
+    using mutex_type = SharedMutex;
+    explicit shared_lock_guard(SharedMutex &mutex) : m_mutex(mutex) { m_mutex.lock_shared(); }
+    ~shared_lock_guard() { m_mutex.unlock_shared(); }
+
+private:
+    SharedMutex &m_mutex;
+};
+
 } // namespace util
