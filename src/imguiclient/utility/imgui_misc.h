@@ -27,6 +27,31 @@ struct WindowPlacement
     ImVec2 size = ImVec2(-FLT_MAX, -FLT_MAX);
 };
 
+struct ScopedStyleColor
+{
+    ScopedStyleColor() {}
+    ~ScopedStyleColor()
+    {
+        if (m_popStyleCount > 0)
+            ImGui::PopStyleColor(m_popStyleCount);
+    }
+
+    void PushStyleColor(ImGuiCol idx, ImU32 col)
+    {
+        ImGui::PushStyleColor(idx, col);
+        ++m_popStyleCount;
+    }
+
+    void PushStyleColor(ImGuiCol idx, const ImVec4 &col)
+    {
+        ImGui::PushStyleColor(idx, col);
+        ++m_popStyleCount;
+    }
+
+private:
+    int m_popStyleCount = 0;
+};
+
 extern WindowPlacement g_lastFileDialogPlacement;
 
 void TextUnformatted(std::string_view view);
@@ -39,6 +64,9 @@ void TooltipTextMarker(const char *fmt, ...);
 void TooltipTextUnformattedMarker(const char *text, const char *text_end = nullptr);
 
 void OverlayProgressBar(const ImRect &rect, float fraction, const char *overlay = nullptr);
+
+ImU32 ImAlphaBlendColors(ImU32 col_a, ImU32 col_b); // Copied from imgui_internal.h
+ImU32 CreateColor(ImU32 color, uint8_t alpha);
 
 void DrawInTextCircle(ImU32 color);
 

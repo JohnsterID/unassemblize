@@ -92,7 +92,7 @@ void OverlayProgressBar(const ImRect &rect, float fraction, const char *overlay)
         ImDrawList *drawList = ImGui::GetWindowDrawList();
 
         // Define a translucent overlay color
-        const ImVec4 dimBgVec4 = ImGui::GetStyleColorVec4(ImGuiCol_ModalWindowDimBg);
+        const ImVec4 &dimBgVec4 = ImGui::GetStyleColorVec4(ImGuiCol_ModalWindowDimBg);
         const ImU32 dimBgU32 = ImGui::ColorConvertFloat4ToU32(dimBgVec4);
 
         // Draw a filled rectangle over the group area
@@ -117,6 +117,22 @@ void OverlayProgressBar(const ImRect &rect, float fraction, const char *overlay)
         // Set cursor position back
         ImGui::SetCursorScreenPos(cursorScreenPos);
     }
+}
+
+ImU32 ImAlphaBlendColors(ImU32 col_a, ImU32 col_b)
+{
+    float t = ((col_b >> IM_COL32_A_SHIFT) & 0xFF) / 255.f;
+    int r = ImLerp((int)(col_a >> IM_COL32_R_SHIFT) & 0xFF, (int)(col_b >> IM_COL32_R_SHIFT) & 0xFF, t);
+    int g = ImLerp((int)(col_a >> IM_COL32_G_SHIFT) & 0xFF, (int)(col_b >> IM_COL32_G_SHIFT) & 0xFF, t);
+    int b = ImLerp((int)(col_a >> IM_COL32_B_SHIFT) & 0xFF, (int)(col_b >> IM_COL32_B_SHIFT) & 0xFF, t);
+    return IM_COL32(r, g, b, 0xFF);
+}
+
+ImU32 CreateColor(ImU32 color, uint8_t alpha)
+{
+    ImU32 rgb = color & 0x00FFFFFF;
+    ImU32 newAlpha = static_cast<ImU32>(alpha) << 24;
+    return rgb | newAlpha;
 }
 
 void DrawInTextCircle(ImU32 color)

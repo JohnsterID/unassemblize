@@ -87,6 +87,11 @@ struct AsmComparisonResult
     // Returns 0..1
     float get_max_similarity(AsmMatchStrictness strictness) const;
 
+    // Returns 0..100
+    int8_t get_similarity_as_int(AsmMatchStrictness strictness) const;
+    // Returns 0..100
+    int8_t get_max_similarity_as_int(AsmMatchStrictness strictness) const;
+
     AsmComparisonRecords records;
     uint32_t label_count = 0;
     uint32_t match_count = 0;

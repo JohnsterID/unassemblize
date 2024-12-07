@@ -154,6 +154,16 @@ float AsmComparisonResult::get_max_similarity(AsmMatchStrictness strictness) con
     return float(get_max_match_count(strictness)) / float(get_instruction_count());
 }
 
+int8_t AsmComparisonResult::get_similarity_as_int(AsmMatchStrictness strictness) const
+{
+    return get_match_count(strictness) * 100 / get_instruction_count();
+}
+
+int8_t AsmComparisonResult::get_max_similarity_as_int(AsmMatchStrictness strictness) const
+{
+    return get_max_match_count(strictness) * 100 / get_instruction_count();
+}
+
 bool NamedFunction::is_disassembled() const
 {
     return function.get_instruction_count() != 0;

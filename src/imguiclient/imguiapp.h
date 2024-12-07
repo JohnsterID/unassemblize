@@ -20,6 +20,7 @@
 #include "runnerasync.h"
 
 #include <chrono>
+#include <optional>
 
 struct CommandLineOptions;
 
@@ -47,6 +48,7 @@ class ImGuiApp
         ImGuiTableFlags_ScrollY;
     // clang-format on
 
+    static constexpr ImU32 RedColor = IM_COL32(255, 0, 0, 255);
     static constexpr ImU32 GreenColor = IM_COL32(0, 255, 0, 255);
     static constexpr std::chrono::system_clock::time_point InvalidTimePoint = std::chrono::system_clock::time_point::min();
     static constexpr uint32_t InvalidId = 0;
@@ -222,9 +224,22 @@ class ImGuiApp
 
             using ImGuiBundlesSelectionArray = std::array<ImGuiSelectionBasicStorage, size_t(MatchBundleType::Count)>;
 
+            struct NamedFunctionUiInfo
+            {
+                void update_label(
+                    const std::string &functionName,
+                    uint32_t functionId,
+                    bool isMatchedFunction,
+                    std::optional<int8_t> similarity = {});
+
+                std::string m_label; // Custom label for the functions list.
+            };
+            using NamedFunctionUiInfos = std::vector<NamedFunctionUiInfo>;
+
             File();
 
             void prepare_rebuild();
+            void init();
 
             void invalidate_command_id();
             bool has_active_command() const;
@@ -235,6 +250,8 @@ class ImGuiApp
             bool named_functions_built() const;
             bool bundles_ready() const; // Bundles can be used when this returns true.
 
+            bool is_matched_function(IndexT namedFunctionIndex) const;
+
             MatchBundleType get_selected_bundle_type() const;
             span<const NamedFunctionBundle> get_active_bundles(MatchBundleType type) const;
             ImGuiSelectionBasicStorage &get_active_bundles_selection(MatchBundleType type);
@@ -243,10 +260,13 @@ class ImGuiApp
             void on_bundles_changed();
             void on_bundles_interaction();
             void update_selected_bundles();
-            void update_active_functions(); // Requires updated selected bundles.
+            void update_active_functions(); // Requires prior call to updated selected bundles.
+            void update_named_function_ui_infos(span<const IndexT> namedFunctionIndices);
 
             span<const IndexT> get_active_named_function_indices() const;
             const NamedFunction &get_filtered_named_function(int index) const;
+            const NamedFunctionMatchInfo &get_filtered_named_function_match_info(int index) const;
+            const NamedFunctionUiInfo &get_filtered_named_function_ui_info(int index) const;
 
             void update_selected_named_functions();
 
@@ -275,7 +295,8 @@ class ImGuiApp
             WorkReason m_workReason = {};
 
             ProgramFileRevisionDescriptorPtr m_revisionDescriptor;
-            NamedFunctionMatchInfos m_namedFunctionsMatchInfos;
+            NamedFunctionMatchInfos m_namedFunctionMatchInfos;
+            NamedFunctionUiInfos m_namedFunctionUiInfos;
             NamedFunctionBundles m_compilandBundles;
             NamedFunctionBundles m_sourceFileBundles;
             NamedFunctionBundle m_singleBundle;
@@ -298,6 +319,7 @@ class ImGuiApp
         ~ProgramComparisonDescriptor();
 
         void prepare_rebuild();
+        void init();
 
         bool has_active_command() const;
 
@@ -308,6 +330,7 @@ class ImGuiApp
 
         // Call relevant File::update_selected_functions before this one.
         void update_selected_matched_functions();
+        void update_matched_named_function_ui_infos(span<const IndexT> matchedFunctionIndices);
 
         span<const IndexT> get_matched_named_function_indices_for_processing(IndexT side);
 
@@ -464,6 +487,10 @@ private:
 
     void ComparisonManagerBody(ProgramComparisonDescriptor &descriptor);
     void ComparisonManagerProgramFileSelection(ProgramComparisonDescriptor::File &file);
+    void ComparisonManagerFunctionListSetColor(
+        ScopedStyleColor &styleColor,
+        const MatchedFunction &matchedFunction,
+        const ProgramComparisonDescriptor::File::NamedFunctionUiInfo &uiInfo);
 
 private:
     ImVec2 m_windowPos = ImVec2(0, 0);
