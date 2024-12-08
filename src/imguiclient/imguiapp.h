@@ -18,6 +18,7 @@
 
 #include "filecontentstorage.h"
 #include "runnerasync.h"
+#include "util.h"
 
 #include <chrono>
 #include <optional>
@@ -58,7 +59,7 @@ class ImGuiApp
     struct ProcessedState
     {
         void init(size_t maxItemsCount);
-        span<const IndexT> get_items_for_processing(span<const IndexT> indices);
+        [[nodiscard]] span<const IndexT> get_items_for_processing(span<const IndexT> indices);
 
     private:
         bool set_item_processed(IndexT index);
@@ -69,6 +70,62 @@ class ImGuiApp
         std::vector<IndexT> m_processedItems;
         // Array of bits for all items to keep track of which ones have been processed.
         std::unique_ptr<uint8_t[]> m_processedItemStates;
+    };
+
+    template<typename AsyncWorkReason>
+    struct AsyncWorkState
+    {
+        using WorkReason = AsyncWorkReason;
+
+        template<uint32_t Size>
+        using WorkQueueCommandIdArray = SizedArray<WorkQueueCommandId, uint32_t, Size>;
+
+        struct WorkItem
+        {
+            WorkQueueCommandId commandId;
+            WorkReason reason;
+        };
+
+        void add(WorkItem &&item) { m_workItems.emplace_back(std::move(item)); }
+
+        void remove(WorkQueueCommandId commandId)
+        {
+            util::find_and_erase_if(m_workItems, [=](const WorkItem &item) { return item.commandId == commandId; });
+        }
+
+        [[nodiscard]] bool empty() const { return m_workItems.empty(); }
+
+        [[nodiscard]] span<const WorkItem> get() const { return span<const WorkItem>{m_workItems}; }
+
+        template<uint32_t Size>
+        [[nodiscard]] WorkQueueCommandIdArray<Size> get_command_id_array(uint64_t reasonMask) const
+        {
+            const uint32_t count = std::min<uint32_t>(Size, m_workItems.size());
+            WorkQueueCommandIdArray<Size> commandIdArray;
+            uint32_t &arrayIndex = commandIdArray.size;
+            for (uint32_t itemIdx = 0; itemIdx < count; ++itemIdx)
+            {
+                const WorkItem &item = m_workItems[itemIdx];
+                if ((uint64_t(1) << uint64_t(item.reason)) & reasonMask)
+                {
+                    commandIdArray.elements[arrayIndex++] = item.commandId;
+                }
+            }
+            return commandIdArray;
+        }
+
+        [[nodiscard]] static constexpr uint64_t get_reason_mask(std::initializer_list<WorkReason> reasons)
+        {
+            uint64_t reasonMask = 0;
+            for (const WorkReason reason : reasons)
+            {
+                reasonMask |= uint64_t(1) << uint64_t(reason);
+            }
+            return reasonMask;
+        }
+
+    private:
+        std::vector<WorkItem> m_workItems;
     };
 
     using ProgramFileId = uint32_t;
@@ -90,8 +147,8 @@ class ImGuiApp
         ProgramFileDescriptor();
         ~ProgramFileDescriptor();
 
-        bool has_active_command() const;
-        WorkQueueCommandId get_active_command_id() const;
+        bool has_async_work() const;
+        WorkQueueCommandId get_first_active_command_id() const;
 
         bool can_load_exe() const;
         bool can_load_pdb() const;
@@ -148,12 +205,14 @@ class ImGuiApp
             LoadSourceFilesForSelectedFunctions,
         };
 
+        using WorkState = AsyncWorkState<WorkReason>;
+
         ProgramFileRevisionDescriptor();
         ~ProgramFileRevisionDescriptor();
 
-        void invalidate_command_id();
-        bool has_active_command() const;
-        WorkQueueCommandId get_active_command_id() const;
+        void add_async_work_hint(WorkQueueCommandId commandId, WorkReason reason);
+        void remove_async_work_hint(WorkQueueCommandId commandId);
+        bool has_async_work() const;
 
         bool can_load_exe() const;
         bool can_load_pdb() const;
@@ -175,9 +234,7 @@ class ImGuiApp
 
         const ProgramFileRevisionId m_id = InvalidId;
 
-        // Has pending asynchronous command(s) running when not invalid.
-        WorkQueueCommandId m_activeCommandId = InvalidWorkQueueCommandId; // #TODO Make vector of chained id's?
-        WorkReason m_workReason = {};
+        WorkState m_asyncWorkState;
 
         // String copies of the file descriptor at the time of async command chain creation.
         // These allows to evaluate async save load operations without a dependency to the file descriptor.
@@ -199,7 +256,7 @@ class ImGuiApp
 
         NamedFunctions m_namedFunctions;
 
-        // Stores named functions that have been async processed already. Links to NamedFunctions.
+        // Stores named functions that have been prepared for async processing already. Links to NamedFunctions.
         ProcessedState m_processedNamedFunctions;
 
         FileContentStorage m_fileContentStrorage;
@@ -243,6 +300,7 @@ class ImGuiApp
             {
             };
 
+            using WorkState = AsyncWorkState<WorkReason>;
             using ImGuiBundlesSelectionArray = std::array<ImGuiSelectionBasicStorage, size_t(MatchBundleType::Count)>;
             using NamedFunctionBundleUiInfos = std::vector<NamedFunctionBundleUiInfo>;
             using NamedFunctionUiInfos = std::vector<NamedFunctionUiInfo>;
@@ -252,9 +310,10 @@ class ImGuiApp
             void prepare_rebuild();
             void init();
 
-            void invalidate_command_id();
-            bool has_active_command() const;
-            WorkQueueCommandId get_active_command_id() const;
+            void add_async_work_hint(WorkQueueCommandId commandId, WorkReason reason);
+            void remove_async_work_hint(WorkQueueCommandId commandId);
+            bool has_async_work() const;
+            WorkQueueCommandId get_first_active_command_id() const;
 
             bool exe_loaded() const;
             bool pdb_loaded() const;
@@ -276,7 +335,7 @@ class ImGuiApp
 
             void update_bundle_ui_infos(MatchBundleType type);
             void update_selected_bundles();
-            void update_active_functions(); // Requires prior call to updated selected bundles.
+            void update_active_functions(); // Requires prior call to update_selected_bundles()
             void update_named_function_ui_infos(span<const IndexT> namedFunctionIndices);
 
             span<const IndexT> get_active_named_function_indices() const;
@@ -306,9 +365,7 @@ class ImGuiApp
             TextFilterDescriptor<const NamedFunctionBundle *> m_bundlesFilter = "bundles_filter";
             TextFilterDescriptor<IndexT> m_functionIndicesFilter = "functions_filter";
 
-            // Has pending asynchronous command(s) running when not invalid.
-            WorkQueueCommandId m_activeCommandId = InvalidWorkQueueCommandId; // #TODO Make vector of chained id's?
-            WorkReason m_workReason = {};
+            WorkState m_asyncWorkState;
 
             ProgramFileRevisionDescriptorPtr m_revisionDescriptor;
 
@@ -349,14 +406,14 @@ class ImGuiApp
         void prepare_rebuild();
         void init();
 
-        bool has_active_command() const;
+        bool has_async_work() const;
 
         bool executables_loaded() const;
         bool named_functions_built() const;
         bool matched_functions_built() const;
         bool bundles_ready() const;
 
-        // Call relevant File::update_selected_functions before this one.
+        // Requires prior call(s) to File::update_selected_functions()
         void update_selected_matched_functions();
 
         void update_all_bundle_ui_infos();
@@ -371,18 +428,18 @@ class ImGuiApp
 
         int m_pendingBuildComparisonRecordsCommands = 0;
 
-        bool m_has_open_window = true;
+        bool m_imguiHasOpenWindow = true;
         bool m_matchedFunctionsBuilt = false;
-
-        std::array<File, 2> m_files;
 
         MatchedFunctions m_matchedFunctions;
 
-        // Stores matched functions that have been async processed already. Links to MatchedFunctions.
+        // Stores matched functions that have been prepared for async processing already. Links to MatchedFunctions.
         ProcessedState m_processedMatchedFunctions;
 
         // Matched Functions that are visible and selected in the ui. Links to MatchedFunctions.
         std::vector<IndexT> m_selectedMatchedFunctionIndices;
+
+        std::array<File, 2> m_files;
 
     private:
         static std::vector<IndexT> build_named_function_indices(

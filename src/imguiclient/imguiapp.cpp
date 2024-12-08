@@ -14,7 +14,6 @@
 #include "executable.h"
 #include "options.h"
 #include "pdbreader.h"
-#include "util.h"
 #include "utility/imgui_scoped.h"
 #include <algorithm>
 #include <filesystem>
@@ -85,24 +84,25 @@ ImGuiApp::ProgramFileDescriptor::~ProgramFileDescriptor()
 {
 }
 
-bool ImGuiApp::ProgramFileDescriptor::has_active_command() const
+bool ImGuiApp::ProgramFileDescriptor::has_async_work() const
 {
-    return get_active_command_id() != InvalidWorkQueueCommandId;
+    return get_first_active_command_id() != InvalidWorkQueueCommandId;
 }
 
-WorkQueueCommandId ImGuiApp::ProgramFileDescriptor::get_active_command_id() const
+WorkQueueCommandId ImGuiApp::ProgramFileDescriptor::get_first_active_command_id() const
 {
-    if (m_revisionDescriptor != nullptr && m_revisionDescriptor->has_active_command())
+    if (m_revisionDescriptor != nullptr && m_revisionDescriptor->has_async_work())
     {
-        switch (m_revisionDescriptor->m_workReason)
-        {
-            case ProgramFileRevisionDescriptor::WorkReason::Load:
-            case ProgramFileRevisionDescriptor::WorkReason::SaveConfig:
-                return m_revisionDescriptor->get_active_command_id();
-            case ProgramFileRevisionDescriptor::WorkReason::BuildNamedFunctions:
-            default:
-                break;
-        }
+        using WorkState = typename ProgramFileRevisionDescriptor::WorkState;
+        using WorkReason = typename WorkState::WorkReason;
+
+        constexpr uint64_t reasonMask = WorkState::get_reason_mask({WorkReason::Load, WorkReason::SaveConfig});
+
+        WorkState::WorkQueueCommandIdArray<1> commandIdArray =
+            m_revisionDescriptor->m_asyncWorkState.get_command_id_array<1>(reasonMask);
+
+        if (commandIdArray.size >= 1)
+            return commandIdArray.elements[0];
     }
 
     return InvalidWorkQueueCommandId;
@@ -244,19 +244,19 @@ ImGuiApp::ProgramFileRevisionDescriptor::~ProgramFileRevisionDescriptor()
 {
 }
 
-void ImGuiApp::ProgramFileRevisionDescriptor::invalidate_command_id()
+void ImGuiApp::ProgramFileRevisionDescriptor::add_async_work_hint(WorkQueueCommandId commandId, WorkReason reason)
 {
-    m_activeCommandId = InvalidWorkQueueCommandId;
+    m_asyncWorkState.add({commandId, reason});
 }
 
-bool ImGuiApp::ProgramFileRevisionDescriptor::has_active_command() const
+void ImGuiApp::ProgramFileRevisionDescriptor::remove_async_work_hint(WorkQueueCommandId commandId)
 {
-    return m_activeCommandId != InvalidWorkQueueCommandId;
+    m_asyncWorkState.remove(commandId);
 }
 
-WorkQueueCommandId ImGuiApp::ProgramFileRevisionDescriptor::get_active_command_id() const
+bool ImGuiApp::ProgramFileRevisionDescriptor::has_async_work() const
 {
-    return m_activeCommandId;
+    return !m_asyncWorkState.empty();
 }
 
 bool ImGuiApp::ProgramFileRevisionDescriptor::can_load_exe() const
@@ -381,7 +381,7 @@ void ImGuiApp::ProgramComparisonDescriptor::File::ListItemUiInfo::update_info(
         {
             if (similarity.has_value())
             {
-                m_label = fmt::format("[M:{:d}%] {:s}##item{:d}", similarity.value(), itemName, itemId);
+                m_label = fmt::format("[M:{:3d}%] {:s}##item{:d}", similarity.value(), itemName, itemId);
             }
             else
             {
@@ -399,6 +399,8 @@ void ImGuiApp::ProgramComparisonDescriptor::File::ListItemUiInfo::update_info(
 
 void ImGuiApp::ProgramComparisonDescriptor::File::prepare_rebuild()
 {
+    assert(!has_async_work());
+
     m_bundlesFilter.reset();
     m_functionIndicesFilter.reset();
 
@@ -437,35 +439,48 @@ void ImGuiApp::ProgramComparisonDescriptor::File::init()
     }
 }
 
-void ImGuiApp::ProgramComparisonDescriptor::File::invalidate_command_id()
+void ImGuiApp::ProgramComparisonDescriptor::File::add_async_work_hint(WorkQueueCommandId commandId, WorkReason reason)
 {
-    m_activeCommandId = InvalidWorkQueueCommandId;
+    m_asyncWorkState.add({commandId, reason});
 }
 
-bool ImGuiApp::ProgramComparisonDescriptor::File::has_active_command() const
+void ImGuiApp::ProgramComparisonDescriptor::File::remove_async_work_hint(WorkQueueCommandId commandId)
 {
-    return get_active_command_id() != InvalidWorkQueueCommandId;
+    m_asyncWorkState.remove(commandId);
 }
 
-WorkQueueCommandId ImGuiApp::ProgramComparisonDescriptor::File::get_active_command_id() const
+bool ImGuiApp::ProgramComparisonDescriptor::File::has_async_work() const
 {
-    if (m_revisionDescriptor != nullptr && m_revisionDescriptor->has_active_command())
+    return get_first_active_command_id() != InvalidWorkQueueCommandId;
+}
+
+WorkQueueCommandId ImGuiApp::ProgramComparisonDescriptor::File::get_first_active_command_id() const
+{
+    if (m_revisionDescriptor != nullptr && m_revisionDescriptor->has_async_work())
     {
-        switch (m_revisionDescriptor->m_workReason)
-        {
-            case ProgramFileRevisionDescriptor::WorkReason::Load:
-            case ProgramFileRevisionDescriptor::WorkReason::BuildNamedFunctions:
-            case ProgramFileRevisionDescriptor::WorkReason::DisassembleSelectedFunctions:
-            case ProgramFileRevisionDescriptor::WorkReason::BuildSourceLinesForSelectedFunctions:
-            case ProgramFileRevisionDescriptor::WorkReason::LoadSourceFilesForSelectedFunctions:
-                return m_revisionDescriptor->get_active_command_id();
-            case ProgramFileRevisionDescriptor::WorkReason::SaveConfig:
-            default:
-                break;
-        }
+        using WorkState = typename ProgramFileRevisionDescriptor::WorkState;
+        using WorkReason = typename WorkState::WorkReason;
+
+        constexpr uint64_t reasonMask = WorkState::get_reason_mask(
+            {WorkReason::Load,
+             WorkReason::BuildNamedFunctions,
+             WorkReason::DisassembleSelectedFunctions,
+             WorkReason::BuildSourceLinesForSelectedFunctions,
+             WorkReason::LoadSourceFilesForSelectedFunctions});
+
+        WorkState::WorkQueueCommandIdArray<1> commandIdArray =
+            m_revisionDescriptor->m_asyncWorkState.get_command_id_array<1>(reasonMask);
+
+        if (commandIdArray.size >= 1)
+            return commandIdArray.elements[0];
     }
 
-    return m_activeCommandId;
+    if (!m_asyncWorkState.empty())
+    {
+        return m_asyncWorkState.get()[0].commandId;
+    }
+
+    return InvalidWorkQueueCommandId;
 }
 
 bool ImGuiApp::ProgramComparisonDescriptor::File::exe_loaded() const
@@ -793,8 +808,12 @@ void ImGuiApp::ProgramComparisonDescriptor::File::update_selected_named_function
 
 void ImGuiApp::ProgramComparisonDescriptor::prepare_rebuild()
 {
+    assert(m_pendingBuildComparisonRecordsCommands == 0);
+
     m_matchedFunctionsBuilt = false;
     util::free_container(m_matchedFunctions);
+    m_processedMatchedFunctions = ProcessedState();
+    util::free_container(m_selectedMatchedFunctionIndices);
 
     for (File &file : m_files)
     {
@@ -810,11 +829,11 @@ void ImGuiApp::ProgramComparisonDescriptor::init()
     }
 }
 
-bool ImGuiApp::ProgramComparisonDescriptor::has_active_command() const
+bool ImGuiApp::ProgramComparisonDescriptor::has_async_work() const
 {
     for (const File &file : m_files)
     {
-        if (file.has_active_command())
+        if (file.has_async_work())
             return true;
     }
     return false;
@@ -1224,15 +1243,14 @@ WorkQueueCommandPtr ImGuiApp::create_load_exe_command(ProgramFileRevisionDescrip
         auto res = static_cast<AsyncLoadExeResult *>(result.get());
         revisionDescriptor->m_executable = std::move(res->executable);
         revisionDescriptor->m_exeLoadTimepoint = std::chrono::system_clock::now();
-        revisionDescriptor->invalidate_command_id();
+        revisionDescriptor->remove_async_work_hint(result->command->command_id);
     };
 
     revisionDescriptor->m_executable.reset();
     revisionDescriptor->m_exeLoadTimepoint = InvalidTimePoint;
     revisionDescriptor->m_exeSaveConfigFilename.clear();
     revisionDescriptor->m_exeSaveConfigTimepoint = InvalidTimePoint;
-    revisionDescriptor->m_activeCommandId = command->command_id;
-    revisionDescriptor->m_workReason = ProgramFileRevisionDescriptor::WorkReason::Load;
+    revisionDescriptor->add_async_work_hint(command->command_id, ProgramFileRevisionDescriptor::WorkReason::Load);
 
     return command;
 }
@@ -1247,7 +1265,7 @@ WorkQueueCommandPtr ImGuiApp::create_load_pdb_command(ProgramFileRevisionDescrip
         auto res = static_cast<AsyncLoadPdbResult *>(result.get());
         revisionDescriptor->m_pdbReader = std::move(res->pdbReader);
         revisionDescriptor->m_pdbLoadTimepoint = std::chrono::system_clock::now();
-        revisionDescriptor->invalidate_command_id();
+        revisionDescriptor->remove_async_work_hint(result->command->command_id);
     };
 
     revisionDescriptor->m_pdbReader.reset();
@@ -1255,8 +1273,7 @@ WorkQueueCommandPtr ImGuiApp::create_load_pdb_command(ProgramFileRevisionDescrip
     revisionDescriptor->m_pdbSaveConfigFilename.clear();
     revisionDescriptor->m_pdbSaveConfigTimepoint = InvalidTimePoint;
     revisionDescriptor->m_exeFilenameFromPdb.clear();
-    revisionDescriptor->m_activeCommandId = command->command_id;
-    revisionDescriptor->m_workReason = ProgramFileRevisionDescriptor::WorkReason::Load;
+    revisionDescriptor->add_async_work_hint(command->command_id, ProgramFileRevisionDescriptor::WorkReason::Load);
 
     return command;
 }
@@ -1297,13 +1314,12 @@ WorkQueueCommandPtr ImGuiApp::create_save_exe_config_command(ProgramFileRevision
             revisionDescriptor->m_exeSaveConfigFilename = util::abs_path(com->options.config_file);
             revisionDescriptor->m_exeSaveConfigTimepoint = std::chrono::system_clock::now();
         }
-        revisionDescriptor->invalidate_command_id();
+        revisionDescriptor->remove_async_work_hint(result->command->command_id);
     };
 
     revisionDescriptor->m_exeSaveConfigFilename.clear();
     revisionDescriptor->m_exeSaveConfigTimepoint = InvalidTimePoint;
-    revisionDescriptor->m_activeCommandId = command->command_id;
-    revisionDescriptor->m_workReason = ProgramFileRevisionDescriptor::WorkReason::SaveConfig;
+    revisionDescriptor->add_async_work_hint(command->command_id, ProgramFileRevisionDescriptor::WorkReason::SaveConfig);
 
     return command;
 }
@@ -1324,13 +1340,12 @@ WorkQueueCommandPtr ImGuiApp::create_save_pdb_config_command(ProgramFileRevision
             revisionDescriptor->m_pdbSaveConfigFilename = util::abs_path(com->options.config_file);
             revisionDescriptor->m_pdbSaveConfigTimepoint = std::chrono::system_clock::now();
         }
-        revisionDescriptor->invalidate_command_id();
+        revisionDescriptor->remove_async_work_hint(result->command->command_id);
     };
 
     revisionDescriptor->m_pdbSaveConfigFilename.clear();
     revisionDescriptor->m_pdbSaveConfigTimepoint = InvalidTimePoint;
-    revisionDescriptor->m_activeCommandId = command->command_id;
-    revisionDescriptor->m_workReason = ProgramFileRevisionDescriptor::WorkReason::SaveConfig;
+    revisionDescriptor->add_async_work_hint(command->command_id, ProgramFileRevisionDescriptor::WorkReason::SaveConfig);
 
     return command;
 }
@@ -1348,13 +1363,14 @@ WorkQueueCommandPtr ImGuiApp::create_build_named_functions_command(ProgramFileRe
         revisionDescriptor->m_namedFunctions = std::move(res->named_functions);
         revisionDescriptor->m_processedNamedFunctions.init(revisionDescriptor->m_namedFunctions.size());
         revisionDescriptor->m_namedFunctionsBuilt = true;
-        revisionDescriptor->invalidate_command_id();
+        revisionDescriptor->remove_async_work_hint(result->command->command_id);
     };
 
     revisionDescriptor->m_namedFunctions.clear();
     revisionDescriptor->m_namedFunctionsBuilt = false;
-    revisionDescriptor->m_activeCommandId = command->command_id;
-    revisionDescriptor->m_workReason = ProgramFileRevisionDescriptor::WorkReason::BuildNamedFunctions;
+    revisionDescriptor->add_async_work_hint(
+        command->command_id,
+        ProgramFileRevisionDescriptor::WorkReason::BuildNamedFunctions);
 
     return command;
 }
@@ -1385,14 +1401,13 @@ WorkQueueCommandPtr ImGuiApp::create_build_matched_functions_command(ProgramComp
             ProgramComparisonDescriptor::File &file = comparisonDescriptor->m_files[i];
 
             file.m_namedFunctionMatchInfos = std::move(res->matchedFunctionsData.namedFunctionMatchInfosArray[i]);
-            file.invalidate_command_id();
+            file.remove_async_work_hint(result->command->command_id);
         }
     };
 
     for (ProgramComparisonDescriptor::File &file : comparisonDescriptor->m_files)
     {
-        file.m_activeCommandId = command->command_id;
-        file.m_workReason = ProgramComparisonDescriptor::File::WorkReason::BuildMatchedFunctions;
+        file.add_async_work_hint(command->command_id, ProgramComparisonDescriptor::File::WorkReason::BuildMatchedFunctions);
     }
 
     return command;
@@ -1416,11 +1431,10 @@ WorkQueueCommandPtr ImGuiApp::create_build_bundles_from_compilands_command(Progr
         auto res = static_cast<AsyncBuildBundlesFromCompilandsResult *>(result.get());
         file->m_compilandBundles = std::move(res->bundles);
         file->m_compilandBundlesBuilt = TriState::True;
-        file->invalidate_command_id();
+        file->remove_async_work_hint(result->command->command_id);
     };
 
-    file->m_activeCommandId = command->command_id;
-    file->m_workReason = ProgramComparisonDescriptor::File::WorkReason::BuildCompilandBundles;
+    file->add_async_work_hint(command->command_id, ProgramComparisonDescriptor::File::WorkReason::BuildCompilandBundles);
 
     return command;
 }
@@ -1443,11 +1457,10 @@ WorkQueueCommandPtr ImGuiApp::create_build_bundles_from_source_files_command(Pro
         auto res = static_cast<AsyncBuildBundlesFromSourceFilesResult *>(result.get());
         file->m_sourceFileBundles = std::move(res->bundles);
         file->m_sourceFileBundlesBuilt = TriState::True;
-        file->invalidate_command_id();
+        file->remove_async_work_hint(result->command->command_id);
     };
 
-    file->m_activeCommandId = command->command_id;
-    file->m_workReason = ProgramComparisonDescriptor::File::WorkReason::BuildSourceFileBundles;
+    file->add_async_work_hint(command->command_id, ProgramComparisonDescriptor::File::WorkReason::BuildSourceFileBundles);
 
     return command;
 }
@@ -1474,11 +1487,10 @@ WorkQueueCommandPtr ImGuiApp::create_build_single_bundle_command(
         auto res = static_cast<AsyncBuildSingleBundleResult *>(result.get());
         file->m_singleBundle = std::move(res->bundle);
         file->m_singleBundleBuilt = true;
-        file->invalidate_command_id();
+        file->remove_async_work_hint(result->command->command_id);
     };
 
-    file->m_activeCommandId = command->command_id;
-    file->m_workReason = ProgramComparisonDescriptor::File::WorkReason::BuildSingleBundle;
+    file->add_async_work_hint(command->command_id, ProgramComparisonDescriptor::File::WorkReason::BuildSingleBundle);
 
     return command;
 }
@@ -1495,10 +1507,13 @@ WorkQueueCommandPtr ImGuiApp::create_disassemble_selected_functions_command(
         namedFunctionIndices,
         *revisionDescriptor->m_executable));
 
-    command->callback = [revisionDescriptor](WorkQueueResultPtr &result) { revisionDescriptor->invalidate_command_id(); };
+    command->callback = [revisionDescriptor](WorkQueueResultPtr &result) {
+        revisionDescriptor->remove_async_work_hint(result->command->command_id);
+    };
 
-    revisionDescriptor->m_activeCommandId = command->command_id;
-    revisionDescriptor->m_workReason = ProgramFileRevisionDescriptor::WorkReason::DisassembleSelectedFunctions;
+    revisionDescriptor->add_async_work_hint(
+        command->command_id,
+        ProgramFileRevisionDescriptor::WorkReason::DisassembleSelectedFunctions);
 
     return command;
 }
@@ -1516,10 +1531,13 @@ WorkQueueCommandPtr ImGuiApp::create_build_source_lines_for_selected_functions_c
             namedFunctionIndices,
             *revisionDescriptor->m_pdbReader));
 
-    command->callback = [revisionDescriptor](WorkQueueResultPtr &result) { revisionDescriptor->invalidate_command_id(); };
+    command->callback = [revisionDescriptor](WorkQueueResultPtr &result) {
+        revisionDescriptor->remove_async_work_hint(result->command->command_id);
+    };
 
-    revisionDescriptor->m_activeCommandId = command->command_id;
-    revisionDescriptor->m_workReason = ProgramFileRevisionDescriptor::WorkReason::BuildSourceLinesForSelectedFunctions;
+    revisionDescriptor->add_async_work_hint(
+        command->command_id,
+        ProgramFileRevisionDescriptor::WorkReason::BuildSourceLinesForSelectedFunctions);
 
     return command;
 }
@@ -1542,11 +1560,12 @@ WorkQueueCommandPtr ImGuiApp::create_load_source_files_for_selected_functions_co
         {
             // Show error?
         }
-        revisionDescriptor->invalidate_command_id();
+        revisionDescriptor->remove_async_work_hint(result->command->command_id);
     };
 
-    revisionDescriptor->m_activeCommandId = command->command_id;
-    revisionDescriptor->m_workReason = ProgramFileRevisionDescriptor::WorkReason::LoadSourceFilesForSelectedFunctions;
+    revisionDescriptor->add_async_work_hint(
+        command->command_id,
+        ProgramFileRevisionDescriptor::WorkReason::LoadSourceFilesForSelectedFunctions);
 
     return command;
 }
@@ -1588,8 +1607,6 @@ WorkQueueCommandPtr ImGuiApp::create_build_comparison_records_for_selected_funct
             namedFunctionsPair,
             matchedFunctionIndices));
 
-    ++comparisonDescriptor->m_pendingBuildComparisonRecordsCommands;
-
     command->callback = [comparisonDescriptor, matchedFunctionIndices](WorkQueueResultPtr &result) {
         comparisonDescriptor->update_matched_named_function_ui_infos(matchedFunctionIndices);
         if (--comparisonDescriptor->m_pendingBuildComparisonRecordsCommands == 0)
@@ -1598,14 +1615,17 @@ WorkQueueCommandPtr ImGuiApp::create_build_comparison_records_for_selected_funct
         }
         for (ProgramComparisonDescriptor::File &file : comparisonDescriptor->m_files)
         {
-            file.invalidate_command_id();
+            file.remove_async_work_hint(result->command->command_id);
         }
     };
 
+    ++comparisonDescriptor->m_pendingBuildComparisonRecordsCommands;
+
     for (ProgramComparisonDescriptor::File &file : comparisonDescriptor->m_files)
     {
-        file.m_activeCommandId = command->command_id;
-        file.m_workReason = ProgramComparisonDescriptor::File::WorkReason::BuildComparisonRecordsForSelectedFunctions;
+        file.add_async_work_hint(
+            command->command_id,
+            ProgramComparisonDescriptor::File::WorkReason::BuildComparisonRecordsForSelectedFunctions);
     }
 
     return command;
@@ -1623,7 +1643,7 @@ ImGuiApp::ProgramFileDescriptor *ImGuiApp::get_program_file_descriptor(size_t pr
 void ImGuiApp::load_async(ProgramFileDescriptor *descriptor)
 {
     assert(descriptor != nullptr);
-    assert(!descriptor->has_active_command());
+    assert(!descriptor->has_async_work());
 
     descriptor->create_new_revision_descriptor();
 
@@ -1635,7 +1655,7 @@ void ImGuiApp::load_async(ProgramFileDescriptor *descriptor)
 void ImGuiApp::save_config_async(ProgramFileDescriptor *descriptor)
 {
     assert(descriptor != nullptr);
-    assert(!descriptor->has_active_command());
+    assert(!descriptor->has_async_work());
     assert(descriptor->m_revisionDescriptor != nullptr);
 
     WorkQueueDelayedCommand head_command;
@@ -1668,7 +1688,7 @@ void ImGuiApp::load_and_init_comparison_async(
 {
     assert(fileDescriptorPair[0]->can_load() || fileDescriptorPair[0]->exe_loaded());
     assert(fileDescriptorPair[1]->can_load() || fileDescriptorPair[1]->exe_loaded());
-    assert(!comparisonDescriptor->has_active_command());
+    assert(!comparisonDescriptor->has_async_work());
 
     for (int i = 0; i < 2; ++i)
     {
@@ -1744,7 +1764,7 @@ void ImGuiApp::load_and_init_comparison_async(
 void ImGuiApp::init_comparison_async(ProgramComparisonDescriptor *comparisonDescriptor)
 {
     assert(comparisonDescriptor != nullptr);
-    assert(!comparisonDescriptor->has_active_command());
+    assert(!comparisonDescriptor->has_async_work());
 
     if (!comparisonDescriptor->named_functions_built())
     {
@@ -1982,7 +2002,7 @@ void ImGuiApp::update_closed_program_comparisons()
         std::remove_if(
             m_programComparisons.begin(),
             m_programComparisons.end(),
-            [](const ProgramComparisonDescriptorPtr &p) { return !p->m_has_open_window && !p->has_active_command(); }),
+            [](const ProgramComparisonDescriptorPtr &p) { return !p->m_imguiHasOpenWindow && !p->has_async_work(); }),
         m_programComparisons.end());
 }
 
@@ -2153,9 +2173,9 @@ void ImGuiApp::ComparisonManagerWindows()
 
         const std::string title = fmt::format("Assembler Comparison {:d}", descriptor.m_id);
 
-        ImScoped::Window window(title.c_str(), &descriptor.m_has_open_window);
+        ImScoped::Window window(title.c_str(), &descriptor.m_imguiHasOpenWindow);
         ImScoped::ID id(i);
-        if (window.IsContentVisible && descriptor.m_has_open_window)
+        if (window.IsContentVisible && descriptor.m_imguiHasOpenWindow)
         {
             ComparisonManagerBody(descriptor);
         }
@@ -2244,7 +2264,7 @@ void ImGuiApp::FileManagerDescriptor(ProgramFileDescriptor &descriptor, bool &er
 {
     {
         ImScoped::Group group;
-        ImScoped::Disabled disabled(descriptor.has_active_command());
+        ImScoped::Disabled disabled(descriptor.has_async_work());
         ImScoped::ItemWidth item_width(ImGui::GetFontSize() * -12);
 
         FileManagerDescriptorExeFile(descriptor);
@@ -2259,13 +2279,13 @@ void ImGuiApp::FileManagerDescriptor(ProgramFileDescriptor &descriptor, bool &er
     }
 
     // Draw command overlay
-    if (descriptor.has_active_command())
+    if (descriptor.has_async_work())
     {
         ImRect group_rect;
         group_rect.Min = ImGui::GetItemRectMin();
         group_rect.Max = ImGui::GetItemRectMax();
 
-        const std::string overlay = fmt::format("Processing command {:d} ..", descriptor.get_active_command_id());
+        const std::string overlay = fmt::format("Processing command {:d} ..", descriptor.get_first_active_command_id());
 
         OverlayProgressBar(group_rect, -1.0f * (float)ImGui::GetTime(), overlay.c_str());
     }
@@ -2305,7 +2325,7 @@ void ImGuiApp::FileManagerDescriptorExeFile(ProgramFileDescriptor &descriptor)
     ImGui::InputTextWithHint("Program File", auto_str, &descriptor.m_exeFilename);
 
     // Tooltip on hover 'auto'
-    if (is_auto_str(descriptor.m_exeFilename) && !descriptor.has_active_command())
+    if (is_auto_str(descriptor.m_exeFilename) && !descriptor.has_async_work())
     {
         const std::string exe_filename = descriptor.evaluate_exe_filename();
         if (exe_filename.empty())
@@ -2332,7 +2352,7 @@ void ImGuiApp::FileManagerDescriptorExeConfig(ProgramFileDescriptor &descriptor)
     ImGui::InputTextWithHint("Program Config File", auto_str, &descriptor.m_exeConfigFilename);
 
     // Tooltip on hover 'auto'
-    if (is_auto_str(descriptor.m_exeConfigFilename) && !descriptor.m_exeFilename.empty() && !descriptor.has_active_command())
+    if (is_auto_str(descriptor.m_exeConfigFilename) && !descriptor.m_exeFilename.empty() && !descriptor.has_async_work())
     {
         const std::string exe_filename = descriptor.evaluate_exe_filename();
         if (exe_filename.empty())
@@ -2932,7 +2952,7 @@ void ImGuiApp::ComparisonManagerBody(ProgramComparisonDescriptor &descriptor)
 
     {
         ImScoped::Group group;
-        ImScoped::Disabled disabled(descriptor.has_active_command());
+        ImScoped::Disabled disabled(descriptor.has_async_work());
 
         // TODO: Make box resizable.
 
@@ -2983,7 +3003,7 @@ void ImGuiApp::ComparisonManagerBody(ProgramComparisonDescriptor &descriptor)
     }
 
     // Draw command overlay
-    if (descriptor.has_active_command())
+    if (descriptor.has_async_work())
     {
         ImRect group_rect;
         group_rect.Min = ImGui::GetItemRectMin();
@@ -2991,8 +3011,8 @@ void ImGuiApp::ComparisonManagerBody(ProgramComparisonDescriptor &descriptor)
 
         const std::string overlay = fmt::format(
             "Processing commands {:d}:{:d} ..",
-            descriptor.m_files[0].get_active_command_id(),
-            descriptor.m_files[1].get_active_command_id());
+            descriptor.m_files[0].get_first_active_command_id(),
+            descriptor.m_files[1].get_first_active_command_id());
 
         OverlayProgressBar(group_rect, -1.0f * (float)ImGui::GetTime(), overlay.c_str());
     }
