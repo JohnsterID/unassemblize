@@ -367,29 +367,33 @@ ImGuiApp::ProgramComparisonDescriptor::File::File()
     }
 }
 
-void ImGuiApp::ProgramComparisonDescriptor::File::NamedFunctionUiInfo::update_label(
-    const std::string &functionName,
-    uint32_t functionId,
-    bool isMatchedFunction,
+void ImGuiApp::ProgramComparisonDescriptor::File::ListItemUiInfo::update_info(
+    const std::string &itemName,
+    uint32_t itemId,
+    bool hasMatchedFunction,
     std::optional<int8_t> similarity)
 {
-    if (m_label.empty() || similarity.has_value())
+    const bool similarityValueChanged = similarity.has_value() && m_similarity != similarity;
+
+    if (m_label.empty() || similarityValueChanged)
     {
-        if (isMatchedFunction)
+        if (hasMatchedFunction)
         {
             if (similarity.has_value())
             {
-                m_label = fmt::format("[M:{:d}%] {:s}##function{:d}", similarity.value(), functionName, functionId);
+                m_label = fmt::format("[M:{:d}%] {:s}##item{:d}", similarity.value(), itemName, itemId);
             }
             else
             {
-                m_label = fmt::format("[M] {:s}##function{:d}", functionName, functionId);
+                m_label = fmt::format("[M] {:s}##item{:d}", itemName, itemId);
             }
         }
         else
         {
-            m_label = fmt::format("{:s}##function{:d}", functionName, functionId);
+            m_label = fmt::format("{:s}##item{:d}", itemName, itemId);
         }
+
+        m_similarity = similarity;
     }
 }
 
@@ -399,10 +403,16 @@ void ImGuiApp::ProgramComparisonDescriptor::File::prepare_rebuild()
     m_functionIndicesFilter.reset();
 
     m_revisionDescriptor.reset();
+
     util::free_container(m_namedFunctionMatchInfos);
     util::free_container(m_compilandBundles);
     util::free_container(m_sourceFileBundles);
     m_singleBundle = NamedFunctionBundle();
+
+    util::free_container(m_namedFunctionUiInfos);
+    util::free_container(m_compilandBundleUiInfos);
+    util::free_container(m_sourceFileBundleUiInfos);
+    m_singleBundleUiInfo = NamedFunctionBundleUiInfo();
 
     m_compilandBundlesBuilt = TriState::False;
     m_sourceFileBundlesBuilt = TriState::False;
@@ -418,6 +428,13 @@ void ImGuiApp::ProgramComparisonDescriptor::File::init()
     assert(named_functions_built());
 
     m_namedFunctionUiInfos.resize(m_revisionDescriptor->m_namedFunctions.size());
+    m_compilandBundleUiInfos.resize(m_compilandBundles.size());
+    m_sourceFileBundleUiInfos.resize(m_sourceFileBundles.size());
+
+    for (IndexT i = 0; i < IndexT(MatchBundleType::Count); ++i)
+    {
+        update_bundle_ui_infos(MatchBundleType(i));
+    }
 }
 
 void ImGuiApp::ProgramComparisonDescriptor::File::invalidate_command_id()
@@ -499,7 +516,7 @@ MatchBundleType ImGuiApp::ProgramComparisonDescriptor::File::get_selected_bundle
     return MatchBundleType::None;
 }
 
-span<const NamedFunctionBundle> ImGuiApp::ProgramComparisonDescriptor::File::get_active_bundles(MatchBundleType type) const
+span<const NamedFunctionBundle> ImGuiApp::ProgramComparisonDescriptor::File::get_bundles(MatchBundleType type) const
 {
     span<const NamedFunctionBundle> bundles;
     switch (type)
@@ -519,7 +536,34 @@ span<const NamedFunctionBundle> ImGuiApp::ProgramComparisonDescriptor::File::get
     return bundles;
 }
 
-ImGuiSelectionBasicStorage &ImGuiApp::ProgramComparisonDescriptor::File::get_active_bundles_selection(MatchBundleType type)
+span<ImGuiApp::ProgramComparisonDescriptor::File::NamedFunctionBundleUiInfo> ImGuiApp::ProgramComparisonDescriptor::File::
+    get_bundle_ui_infos(MatchBundleType type)
+{
+    span<NamedFunctionBundleUiInfo> bundle_ui_infos;
+    switch (type)
+    {
+        case MatchBundleType::Compiland:
+            bundle_ui_infos = {m_compilandBundleUiInfos};
+            break;
+        case MatchBundleType::SourceFile:
+            bundle_ui_infos = {m_sourceFileBundleUiInfos};
+            break;
+        case MatchBundleType::None:
+            bundle_ui_infos = {&m_singleBundleUiInfo, 1};
+            break;
+    }
+    static_assert(size_t(MatchBundleType::Count) == 3, "Enum was changed. Update switch case.");
+
+    return bundle_ui_infos;
+}
+
+span<const ImGuiApp::ProgramComparisonDescriptor::File::NamedFunctionBundleUiInfo> ImGuiApp::ProgramComparisonDescriptor::
+    File::get_bundle_ui_infos(MatchBundleType type) const
+{
+    return const_cast<ImGuiApp::ProgramComparisonDescriptor::File *>(this)->get_bundle_ui_infos(type);
+}
+
+ImGuiSelectionBasicStorage &ImGuiApp::ProgramComparisonDescriptor::File::get_bundles_selection(MatchBundleType type)
 {
     return m_imguiBundlesSelectionArray[size_t(type)];
 }
@@ -527,6 +571,15 @@ ImGuiSelectionBasicStorage &ImGuiApp::ProgramComparisonDescriptor::File::get_act
 const NamedFunctionBundle &ImGuiApp::ProgramComparisonDescriptor::File::get_filtered_bundle(int index) const
 {
     return *m_bundlesFilter.filtered[index];
+}
+
+const ImGuiApp::ProgramComparisonDescriptor::File::NamedFunctionBundleUiInfo &ImGuiApp::ProgramComparisonDescriptor::File::
+    get_filtered_bundle_ui_info(int index) const
+{
+    const span<const NamedFunctionBundleUiInfo> bundleUiInfos = get_bundle_ui_infos(get_selected_bundle_type());
+    const IndexT bundleIndex = m_bundlesFilter.filtered[index]->id;
+    assert(bundleIndex < bundleUiInfos.size());
+    return bundleUiInfos[bundleIndex];
 }
 
 void ImGuiApp::ProgramComparisonDescriptor::File::on_bundles_changed()
@@ -543,11 +596,29 @@ void ImGuiApp::ProgramComparisonDescriptor::File::on_bundles_interaction()
     update_named_function_ui_infos(get_active_named_function_indices());
 }
 
+void ImGuiApp::ProgramComparisonDescriptor::File::update_bundle_ui_infos(MatchBundleType type)
+{
+    const NamedFunctions &namedFunctions = m_revisionDescriptor->m_namedFunctions;
+    const span<const NamedFunctionBundle> bundles = get_bundles(type);
+    const span<NamedFunctionBundleUiInfo> bundleUiInfos = get_bundle_ui_infos(type);
+    const IndexT bundleCount = bundles.size();
+    assert(bundleUiInfos.size() == bundleCount);
+
+    for (IndexT i = 0; i < bundleCount; ++i)
+    {
+        const NamedFunctionBundle &bundle = bundles[i];
+        NamedFunctionBundleUiInfo &uiInfo = bundleUiInfos[i];
+        const bool hasMatchedFunction = !bundle.matchedFunctionIndices.empty();
+
+        uiInfo.update_info(bundle.name, bundle.id, hasMatchedFunction);
+    }
+}
+
 void ImGuiApp::ProgramComparisonDescriptor::File::update_selected_bundles()
 {
     const MatchBundleType type = get_selected_bundle_type();
-    span<const NamedFunctionBundle> activeBundles = get_active_bundles(type);
-    ImGuiSelectionBasicStorage &selection = get_active_bundles_selection(type);
+    span<const NamedFunctionBundle> activeBundles = get_bundles(type);
+    ImGuiSelectionBasicStorage &selection = get_bundles_selection(type);
 
     std::vector<const NamedFunctionBundle *> selectedBundles;
     selectedBundles.reserve(selection.Size);
@@ -632,9 +703,9 @@ void ImGuiApp::ProgramComparisonDescriptor::File::update_named_function_ui_infos
     {
         const NamedFunction &namedFunction = m_revisionDescriptor->m_namedFunctions[functionIndex];
         const NamedFunctionMatchInfo &matchInfo = m_namedFunctionMatchInfos[functionIndex];
-        NamedFunctionUiInfo &uiInfo = m_namedFunctionUiInfos[functionIndex];
+        ListItemUiInfo &uiInfo = m_namedFunctionUiInfos[functionIndex];
 
-        uiInfo.update_label(namedFunction.name, namedFunction.id, matchInfo.is_matched());
+        uiInfo.update_info(namedFunction.name, namedFunction.id, matchInfo.is_matched());
     }
 }
 
@@ -843,6 +914,69 @@ void ImGuiApp::ProgramComparisonDescriptor::update_selected_matched_functions()
     m_selectedMatchedFunctionIndices.shrink_to_fit();
 }
 
+void ImGuiApp::ProgramComparisonDescriptor::update_all_bundle_ui_infos()
+{
+    // Updates ui infos for all bundles to avoid missing any.
+    // Potentially is more expensive than we would like it to be.
+    // We try to keep calls to a minimum.
+
+    for (IndexT fileIdx = 0; fileIdx < 2; ++fileIdx)
+    {
+        File &file = m_files[fileIdx];
+
+        for (IndexT bundleType = 0; bundleType < IndexT(MatchBundleType::Count); ++bundleType)
+        {
+            const span<const NamedFunctionBundle> bundles = file.get_bundles(MatchBundleType(bundleType));
+            const span<File::NamedFunctionBundleUiInfo> bundleUiInfos =
+                file.get_bundle_ui_infos(MatchBundleType(bundleType));
+            const IndexT bundleCount = bundles.size();
+            assert(bundleUiInfos.size() == bundleCount);
+
+            for (IndexT bundleIdx = 0; bundleIdx < bundleCount; ++bundleIdx)
+            {
+                const NamedFunctionBundle &bundle = bundles[bundleIdx];
+                if (bundle.matchedFunctionIndices.empty())
+                    continue;
+
+                File::NamedFunctionBundleUiInfo &uiInfo = bundleUiInfos[bundleIdx];
+                if (uiInfo.m_similarity.has_value())
+                    continue;
+
+                const FunctionsSimilarityReport report = build_function_similarity_report({bundle.matchedFunctionIndices});
+
+                if (!report.has_result())
+                    continue;
+
+                const uint32_t avgSimilarity = report.totalSimilarity.value() / bundle.allNamedFunctionIndices.size();
+                uiInfo.update_info(bundle.name, bundle.id, true, avgSimilarity);
+            }
+        }
+    }
+}
+
+ImGuiApp::ProgramComparisonDescriptor::FunctionsSimilarityReport ImGuiApp::ProgramComparisonDescriptor::
+    build_function_similarity_report(span<const IndexT> matchedFunctionIndices)
+{
+    assert(!matchedFunctionIndices.empty());
+    FunctionsSimilarityReport report;
+    report.totalSimilarity.emplace(0);
+
+    for (IndexT matchedFunctionIndex : matchedFunctionIndices)
+    {
+        const MatchedFunction &matchedFunction = m_matchedFunctions[matchedFunctionIndex];
+
+        if (!matchedFunction.is_compared())
+        {
+            // Is missing comparison. Report is incomplete.
+            report.totalSimilarity = std::nullopt;
+            break;
+        }
+        // #TODO: Make strictness configurable.
+        report.totalSimilarity.value() += matchedFunction.comparison.get_similarity_as_int(AsmMatchStrictness::Lenient);
+    }
+    return report;
+}
+
 void ImGuiApp::ProgramComparisonDescriptor::update_matched_named_function_ui_infos(span<const IndexT> matchedFunctionIndices)
 {
     for (IndexT matchedFunctionIndex : matchedFunctionIndices)
@@ -858,7 +992,7 @@ void ImGuiApp::ProgramComparisonDescriptor::update_matched_named_function_ui_inf
             const NamedFunction &namedFunction = file.m_revisionDescriptor->m_namedFunctions[namedFunctionIndex];
             // #TODO: Make strictness configurable.
             const int8_t similarity = matchedFunction.comparison.get_similarity_as_int(AsmMatchStrictness::Lenient);
-            uiInfo.update_label(namedFunction.name, namedFunction.id, true, similarity);
+            uiInfo.update_info(namedFunction.name, namedFunction.id, true, similarity);
         }
     }
 }
@@ -1276,7 +1410,7 @@ WorkQueueCommandPtr ImGuiApp::create_build_bundles_from_compilands_command(Progr
         file->m_namedFunctionMatchInfos,
         *file->m_revisionDescriptor->m_pdbReader));
 
-    command->options.flags = BuildAllNamedFunctionIndices;
+    command->options.flags = GuiBuildBundleFlags;
 
     command->callback = [file](WorkQueueResultPtr &result) {
         auto res = static_cast<AsyncBuildBundlesFromCompilandsResult *>(result.get());
@@ -1303,7 +1437,7 @@ WorkQueueCommandPtr ImGuiApp::create_build_bundles_from_source_files_command(Pro
         file->m_namedFunctionMatchInfos,
         *file->m_revisionDescriptor->m_pdbReader));
 
-    command->options.flags = BuildAllNamedFunctionIndices;
+    command->options.flags = GuiBuildBundleFlags;
 
     command->callback = [file](WorkQueueResultPtr &result) {
         auto res = static_cast<AsyncBuildBundlesFromSourceFilesResult *>(result.get());
@@ -1334,7 +1468,7 @@ WorkQueueCommandPtr ImGuiApp::create_build_single_bundle_command(
         comparisonDescriptor->m_matchedFunctions,
         bundle_file_idx));
 
-    command->options.flags = BuildAllNamedFunctionIndices;
+    command->options.flags = GuiBuildBundleFlags;
 
     command->callback = [file](WorkQueueResultPtr &result) {
         auto res = static_cast<AsyncBuildSingleBundleResult *>(result.get());
@@ -1454,8 +1588,14 @@ WorkQueueCommandPtr ImGuiApp::create_build_comparison_records_for_selected_funct
             namedFunctionsPair,
             matchedFunctionIndices));
 
+    ++comparisonDescriptor->m_pendingBuildComparisonRecordsCommands;
+
     command->callback = [comparisonDescriptor, matchedFunctionIndices](WorkQueueResultPtr &result) {
         comparisonDescriptor->update_matched_named_function_ui_infos(matchedFunctionIndices);
+        if (--comparisonDescriptor->m_pendingBuildComparisonRecordsCommands == 0)
+        {
+            comparisonDescriptor->update_all_bundle_ui_infos();
+        }
         for (ProgramComparisonDescriptor::File &file : comparisonDescriptor->m_files)
         {
             file.invalidate_command_id();
@@ -1762,6 +1902,9 @@ void ImGuiApp::process_named_and_matched_functions_async(
     {
         // Process named functions first.
 
+        // Increment here because the command is delayed and therefore the pending work would be unknown at this time.
+        ++comparisonDescriptor->m_pendingBuildComparisonRecordsCommands;
+
         auto sharedWorkCount = std::make_shared<int>(analyzeNamedFunctionsCount);
 
         for (IndexT i = 0; i < 2; ++i)
@@ -1778,6 +1921,7 @@ void ImGuiApp::process_named_and_matched_functions_async(
                         WorkQueueResultPtr &result) -> WorkQueueCommandPtr {
                         if (--(*sharedWorkCount) == 0)
                         {
+                            --comparisonDescriptor->m_pendingBuildComparisonRecordsCommands;
                             process_matched_functions_async(comparisonDescriptor, matchedFunctionIndices);
                         }
                         return nullptr;
@@ -2919,8 +3063,8 @@ void ImGuiApp::ComparisonManagerBody(ProgramComparisonDescriptor &descriptor)
                     // Draw bundles filter
                     {
                         const MatchBundleType type = file.get_selected_bundle_type();
-                        const ImGuiSelectionBasicStorage &selection = file.get_active_bundles_selection(type);
-                        const span<const NamedFunctionBundle> bundles = file.get_active_bundles(type);
+                        const ImGuiSelectionBasicStorage &selection = file.get_bundles_selection(type);
+                        const span<const NamedFunctionBundle> bundles = file.get_bundles(type);
 
                         const bool selectionChanged = UpdateFilter(
                             file.m_bundlesFilter,
@@ -2956,7 +3100,7 @@ void ImGuiApp::ComparisonManagerBody(ProgramComparisonDescriptor &descriptor)
                         if (child.IsContentVisible)
                         {
                             const MatchBundleType type = file.get_selected_bundle_type();
-                            ImGuiSelectionBasicStorage &selection = file.get_active_bundles_selection(type);
+                            ImGuiSelectionBasicStorage &selection = file.get_bundles_selection(type);
                             const int count = file.m_bundlesFilter.filtered.size();
                             const int oldSelectionSize = selection.Size;
                             bool selectionChanged = false;
@@ -2975,8 +3119,17 @@ void ImGuiApp::ComparisonManagerBody(ProgramComparisonDescriptor &descriptor)
                                 ImGui::SetNextItemSelectionUserData(n);
                                 // 2
                                 const NamedFunctionBundle &bundle = file.get_filtered_bundle(n);
+                                const File::ListItemUiInfo &uiInfo = file.get_filtered_bundle_ui_info(n);
+
+                                ScopedStyleColor styleColor;
+
+                                if (uiInfo.m_similarity.has_value())
+                                {
+                                    ComparisonManagerItemListStyleColor(styleColor, uiInfo);
+                                }
+
                                 const bool selected = selection.Contains(ImGuiID(bundle.id));
-                                selectionChanged |= ImGui::Selectable(bundle.name.c_str(), selected);
+                                selectionChanged |= ImGui::Selectable(uiInfo.m_label.c_str(), selected);
                             }
 
                             ms_io = ImGui::EndMultiSelect();
@@ -3068,18 +3221,12 @@ void ImGuiApp::ComparisonManagerBody(ProgramComparisonDescriptor &descriptor)
                                 // 2
                                 const NamedFunction &namedFunction = file.get_filtered_named_function(n);
                                 const File::NamedFunctionUiInfo &uiInfo = file.get_filtered_named_function_ui_info(n);
-                                const NamedFunctionMatchInfo &matchInfo = file.get_filtered_named_function_match_info(n);
 
                                 ScopedStyleColor styleColor;
 
-                                if (matchInfo.is_matched())
+                                if (uiInfo.m_similarity.has_value())
                                 {
-                                    const MatchedFunction &matchedFunction =
-                                        descriptor.m_matchedFunctions[matchInfo.matched_index];
-                                    if (matchedFunction.is_compared())
-                                    {
-                                        ComparisonManagerFunctionListSetColor(styleColor, matchedFunction, uiInfo);
-                                    }
+                                    ComparisonManagerItemListStyleColor(styleColor, uiInfo);
                                 }
 
                                 const bool selected = selection.Contains(ImGuiID(namedFunction.id));
@@ -3128,16 +3275,14 @@ void ImGuiApp::ComparisonManagerProgramFileSelection(ProgramComparisonDescriptor
     }
 }
 
-void ImGuiApp::ComparisonManagerFunctionListSetColor(
+void ImGuiApp::ComparisonManagerItemListStyleColor(
     ScopedStyleColor &styleColor,
-    const MatchedFunction &matchedFunction,
-    const ProgramComparisonDescriptor::File::NamedFunctionUiInfo &uiInfo)
+    const ProgramComparisonDescriptor::File::ListItemUiInfo &uiInfo)
 {
-    // #TODO: Make configurable
-    const float similarity = matchedFunction.comparison.get_similarity(AsmMatchStrictness::Lenient);
-
     ImU32 mainColor;
-    if (similarity == 1.0f)
+
+    assert(uiInfo.m_similarity.has_value());
+    if (uiInfo.m_similarity.value() == 100)
     {
         // Set green color when similarity is 100%.
         mainColor = GreenColor;
@@ -3145,6 +3290,7 @@ void ImGuiApp::ComparisonManagerFunctionListSetColor(
     else
     {
         // Blend from red to somewhat green when similarity is 0-99%.
+        const float similarity = float(uiInfo.m_similarity.value()) / 100;
         const ImU32 CloseToGreenColor = IM_COL32(0, 255, 0, ImU32(similarity * 160));
         mainColor = ImAlphaBlendColors(RedColor, CloseToGreenColor);
     }

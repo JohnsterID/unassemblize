@@ -48,6 +48,7 @@ class ImGuiApp
         ImGuiTableFlags_ScrollY;
     // clang-format on
 
+    static constexpr uint8_t GuiBuildBundleFlags = BuildMatchedFunctionIndices | BuildAllNamedFunctionIndices;
     static constexpr ImU32 RedColor = IM_COL32(255, 0, 0, 255);
     static constexpr ImU32 GreenColor = IM_COL32(0, 255, 0, 255);
     static constexpr std::chrono::system_clock::time_point InvalidTimePoint = std::chrono::system_clock::time_point::min();
@@ -222,18 +223,28 @@ class ImGuiApp
                 BuildComparisonRecordsForSelectedFunctions,
             };
 
-            using ImGuiBundlesSelectionArray = std::array<ImGuiSelectionBasicStorage, size_t(MatchBundleType::Count)>;
-
-            struct NamedFunctionUiInfo
+            struct ListItemUiInfo
             {
-                void update_label(
-                    const std::string &functionName,
-                    uint32_t functionId,
-                    bool isMatchedFunction,
-                    std::optional<int8_t> similarity = {});
+                void update_info(
+                    const std::string &itemName,
+                    uint32_t itemId,
+                    bool hasMatchedFunction,
+                    std::optional<int8_t> similarity = std::nullopt);
 
-                std::string m_label; // Custom label for the functions list.
+                std::string m_label;
+                std::optional<int8_t> m_similarity = std::nullopt;
             };
+
+            struct NamedFunctionBundleUiInfo : public ListItemUiInfo
+            {
+            };
+
+            struct NamedFunctionUiInfo : public ListItemUiInfo
+            {
+            };
+
+            using ImGuiBundlesSelectionArray = std::array<ImGuiSelectionBasicStorage, size_t(MatchBundleType::Count)>;
+            using NamedFunctionBundleUiInfos = std::vector<NamedFunctionBundleUiInfo>;
             using NamedFunctionUiInfos = std::vector<NamedFunctionUiInfo>;
 
             File();
@@ -253,12 +264,17 @@ class ImGuiApp
             bool is_matched_function(IndexT namedFunctionIndex) const;
 
             MatchBundleType get_selected_bundle_type() const;
-            span<const NamedFunctionBundle> get_active_bundles(MatchBundleType type) const;
-            ImGuiSelectionBasicStorage &get_active_bundles_selection(MatchBundleType type);
+            span<const NamedFunctionBundle> get_bundles(MatchBundleType type) const;
+            span<NamedFunctionBundleUiInfo> get_bundle_ui_infos(MatchBundleType type);
+            span<const NamedFunctionBundleUiInfo> get_bundle_ui_infos(MatchBundleType type) const;
+            ImGuiSelectionBasicStorage &get_bundles_selection(MatchBundleType type);
             const NamedFunctionBundle &get_filtered_bundle(int index) const;
+            const NamedFunctionBundleUiInfo &get_filtered_bundle_ui_info(int index) const;
 
             void on_bundles_changed();
             void on_bundles_interaction();
+
+            void update_bundle_ui_infos(MatchBundleType type);
             void update_selected_bundles();
             void update_active_functions(); // Requires prior call to updated selected bundles.
             void update_named_function_ui_infos(span<const IndexT> namedFunctionIndices);
@@ -295,11 +311,16 @@ class ImGuiApp
             WorkReason m_workReason = {};
 
             ProgramFileRevisionDescriptorPtr m_revisionDescriptor;
+
             NamedFunctionMatchInfos m_namedFunctionMatchInfos;
-            NamedFunctionUiInfos m_namedFunctionUiInfos;
             NamedFunctionBundles m_compilandBundles;
             NamedFunctionBundles m_sourceFileBundles;
             NamedFunctionBundle m_singleBundle;
+
+            NamedFunctionUiInfos m_namedFunctionUiInfos;
+            NamedFunctionBundleUiInfos m_compilandBundleUiInfos;
+            NamedFunctionBundleUiInfos m_sourceFileBundleUiInfos;
+            NamedFunctionBundleUiInfo m_singleBundleUiInfo;
 
             TriState m_compilandBundlesBuilt = TriState::False;
             TriState m_sourceFileBundlesBuilt = TriState::False;
@@ -313,6 +334,13 @@ class ImGuiApp
 
             // Functions that are visible and selected in the ui. Links to NamedFunctions.
             std::vector<IndexT> m_selectedNamedFunctionIndices;
+        };
+
+        struct FunctionsSimilarityReport
+        {
+            bool has_result() const { return totalSimilarity.has_value(); }
+
+            std::optional<uint32_t> totalSimilarity = std::nullopt; // Accumulative similarity value of matched functions.
         };
 
         ProgramComparisonDescriptor();
@@ -330,11 +358,18 @@ class ImGuiApp
 
         // Call relevant File::update_selected_functions before this one.
         void update_selected_matched_functions();
+
+        void update_all_bundle_ui_infos();
+
+        FunctionsSimilarityReport build_function_similarity_report(span<const IndexT> matchedFunctionIndices);
+
         void update_matched_named_function_ui_infos(span<const IndexT> matchedFunctionIndices);
 
         span<const IndexT> get_matched_named_function_indices_for_processing(IndexT side);
 
         const ProgramComparisonId m_id = InvalidId;
+
+        int m_pendingBuildComparisonRecordsCommands = 0;
 
         bool m_has_open_window = true;
         bool m_matchedFunctionsBuilt = false;
@@ -487,10 +522,9 @@ private:
 
     void ComparisonManagerBody(ProgramComparisonDescriptor &descriptor);
     void ComparisonManagerProgramFileSelection(ProgramComparisonDescriptor::File &file);
-    void ComparisonManagerFunctionListSetColor(
+    void ComparisonManagerItemListStyleColor(
         ScopedStyleColor &styleColor,
-        const MatchedFunction &matchedFunction,
-        const ProgramComparisonDescriptor::File::NamedFunctionUiInfo &uiInfo);
+        const ProgramComparisonDescriptor::File::ListItemUiInfo &uiInfo);
 
 private:
     ImVec2 m_windowPos = ImVec2(0, 0);
