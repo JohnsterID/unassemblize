@@ -179,16 +179,6 @@ TriState NamedFunction::is_linked_to_source_file() const
         return TriState::True;
 }
 
-TriState NamedFunction::has_loaded_source_file() const
-{
-    if (!canLinkToSourceFile)
-        return TriState::NotApplicable;
-    if (hasLoadedSourceFile)
-        return TriState::True;
-    else
-        return TriState::False;
-}
-
 bool NamedFunctionMatchInfo::is_matched() const
 {
     return matched_index != ~IndexT(0);

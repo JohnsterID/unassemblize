@@ -106,7 +106,6 @@ struct NamedFunction
 
     bool is_disassembled() const;
     TriState is_linked_to_source_file() const;
-    TriState has_loaded_source_file() const;
 
     std::string name;
     Function function;
@@ -115,10 +114,6 @@ struct NamedFunction
 
     // Is set false if function could not be linked to a source file.
     bool canLinkToSourceFile = true;
-
-    // Is set true if a source file load request has succeeded.
-    // The lifetime of the source file is independent and therefore could become out of sync.
-    bool hasLoadedSourceFile = false;
 };
 using NamedFunctions = std::vector<NamedFunction>;
 using NamedFunctionPair = std::array<NamedFunction *, 2>;

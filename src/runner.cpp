@@ -256,7 +256,10 @@ bool Runner::process_asm_comparison(const AsmComparisonOptions &o)
     if (o.print_sourceline_len + o.print_sourcecode_len > 0)
     {
         build_source_lines_for_matched_functions(named_functions_pair, matched_data.matchedFunctions, o.pdb_reader_pair);
-        load_source_files_for_matched_functions(source_file_storage, named_functions_pair, matched_data.matchedFunctions);
+        load_source_files_for_matched_functions(
+            source_file_storage,
+            const_named_functions_pair,
+            matched_data.matchedFunctions);
     }
 
     build_comparison_records_for_matched_functions(
@@ -737,7 +740,7 @@ void Runner::build_source_lines_for_functions(span<NamedFunction> named_function
     }
 }
 
-bool Runner::load_source_file_for_function(FileContentStorage &storage, NamedFunction &named)
+bool Runner::load_source_file_for_function(FileContentStorage &storage, const NamedFunction &named)
 {
     if (!named.canLinkToSourceFile)
     {
@@ -748,13 +751,12 @@ bool Runner::load_source_file_for_function(FileContentStorage &storage, NamedFun
     assert(named.is_linked_to_source_file() == TriState::True);
 
     FileContentStorage::LoadResult result = storage.load_content(named.function.get_source_file_name());
-    named.hasLoadedSourceFile = result != FileContentStorage::LoadResult::Failed;
-    return named.hasLoadedSourceFile;
+    return result != FileContentStorage::LoadResult::Failed;
 }
 
 bool Runner::load_source_files_for_matched_functions(
     FileContentStorage &storage,
-    NamedFunctionsPair named_functions_pair,
+    ConstNamedFunctionsPair named_functions_pair,
     const MatchedFunctions &matched_functions)
 {
     bool success = true;
@@ -762,7 +764,7 @@ bool Runner::load_source_files_for_matched_functions(
     {
         for (size_t i = 0; i < 2; ++i)
         {
-            NamedFunction &named = named_functions_pair[i]->at(matched.named_idx_pair[i]);
+            const NamedFunction &named = named_functions_pair[i]->at(matched.named_idx_pair[i]);
             success &= load_source_file_for_function(storage, named);
         }
     }
@@ -771,7 +773,7 @@ bool Runner::load_source_files_for_matched_functions(
 
 bool Runner::load_source_files_for_selected_functions(
     FileContentStorage &storage,
-    NamedFunctions &named_functions,
+    const NamedFunctions &named_functions,
     span<const IndexT> named_function_indices)
 {
     bool success = true;
