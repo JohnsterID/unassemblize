@@ -674,7 +674,7 @@ void Runner::disassemble_functions(span<NamedFunction> named_functions, const Ex
 
 void Runner::build_source_lines_for_function(NamedFunction &named, const PdbReader &pdb_reader)
 {
-    if (named.is_linked_to_source_file() || !named.can_link_to_source_file)
+    if (named.is_linked_to_source_file() != TriState::False)
         return;
 
     const Address64T address = named.function.get_begin_address();
@@ -688,7 +688,7 @@ void Runner::build_source_lines_for_function(NamedFunction &named, const PdbRead
     }
     else
     {
-        named.can_link_to_source_file = false;
+        named.canLinkToSourceFile = false;
     }
 }
 
@@ -712,7 +712,7 @@ void Runner::build_source_lines_for_matched_functions(
             for (const MatchedFunction &matched : matched_functions)
             {
                 NamedFunction &named = named_functions_pair[i]->at(matched.named_idx_pair[i]);
-                named.can_link_to_source_file = false;
+                named.canLinkToSourceFile = false;
             }
         }
     }
@@ -739,17 +739,17 @@ void Runner::build_source_lines_for_functions(span<NamedFunction> named_function
 
 bool Runner::load_source_file_for_function(FileContentStorage &storage, NamedFunction &named)
 {
-    if (!named.can_link_to_source_file)
+    if (!named.canLinkToSourceFile)
     {
         // Has no source file associated. Treat as success.
         return true;
     }
 
-    assert(named.is_linked_to_source_file());
+    assert(named.is_linked_to_source_file() == TriState::True);
 
     FileContentStorage::LoadResult result = storage.load_content(named.function.get_source_file_name());
-    named.has_loaded_source_file = result != FileContentStorage::LoadResult::Failed;
-    return named.has_loaded_source_file;
+    named.hasLoadedSourceFile = result != FileContentStorage::LoadResult::Failed;
+    return named.hasLoadedSourceFile;
 }
 
 bool Runner::load_source_files_for_matched_functions(
