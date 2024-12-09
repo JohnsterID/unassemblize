@@ -27,48 +27,6 @@ ImGuiApp::ProgramFileId ImGuiApp::ProgramFileDescriptor::s_id = 1;
 ImGuiApp::ProgramFileRevisionId ImGuiApp::ProgramFileRevisionDescriptor::s_id = 1;
 ImGuiApp::ProgramComparisonId ImGuiApp::ProgramComparisonDescriptor::s_id = 1;
 
-void ImGuiApp::ProcessedState::init(size_t maxItemsCount)
-{
-    m_processedItems.reserve(maxItemsCount);
-    m_processedItemStates = BitArray(maxItemsCount, false);
-}
-
-bool ImGuiApp::ProcessedState::set_item_processed(IndexT index)
-{
-    if (m_processedItemStates.get(index))
-        return false;
-
-    m_processedItems.push_back(index);
-    m_processedItemStates.set(index);
-    return true;
-}
-
-size_t ImGuiApp::ProcessedState::get_processed_item_count() const
-{
-    return m_processedItems.size();
-}
-
-span<const IndexT> ImGuiApp::ProcessedState::get_processed_items(size_t begin, size_t end) const
-{
-    assert(begin <= end);
-    assert(end <= m_processedItems.size());
-
-    return span<const IndexT>{m_processedItems.data() + begin, m_processedItems.data() + end};
-}
-
-span<const IndexT> ImGuiApp::ProcessedState::get_items_for_processing(span<const IndexT> items)
-{
-    const size_t begin = get_processed_item_count();
-
-    for (IndexT index : items)
-    {
-        set_item_processed(index);
-    }
-
-    const size_t end = get_processed_item_count();
-    return get_processed_items(begin, end);
-}
-
 ImGuiApp::ProgramFileDescriptor::ProgramFileDescriptor() : m_id(s_id++)
 {
 }

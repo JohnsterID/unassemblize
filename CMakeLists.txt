@@ -183,8 +183,11 @@ target_sources(unassemblize PRIVATE
     src/version.h
     src/workqueue.cpp
     src/workqueue.h
+    src/imguiclient/asyncworkstate.h
     src/imguiclient/imguiapp.cpp
     src/imguiclient/imguiapp.h
+    src/imguiclient/processedstate.cpp
+    src/imguiclient/processedstate.h
     src/imguiclient/utility/imgui_misc.cpp
     src/imguiclient/utility/imgui_misc.h
     src/imguiclient/utility/imgui_scoped.h
