@@ -19,6 +19,7 @@
 #include "filecontentstorage.h"
 #include "runnerasync.h"
 #include "util.h"
+#include "util/bitarray.h"
 
 #include <chrono>
 #include <optional>
@@ -69,7 +70,7 @@ class ImGuiApp
         // Items that have been processed.
         std::vector<IndexT> m_processedItems;
         // Array of bits for all items to keep track of which ones have been processed.
-        std::unique_ptr<uint8_t[]> m_processedItemStates;
+        BitArray m_processedItemStates;
     };
 
     template<typename AsyncWorkReason>

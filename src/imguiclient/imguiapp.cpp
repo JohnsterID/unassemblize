@@ -30,23 +30,16 @@ ImGuiApp::ProgramComparisonId ImGuiApp::ProgramComparisonDescriptor::s_id = 1;
 void ImGuiApp::ProcessedState::init(size_t maxItemsCount)
 {
     m_processedItems.reserve(maxItemsCount);
-    const size_t bitsSize = maxItemsCount / 8 + 1;
-    m_processedItemStates = std::make_unique<uint8_t[]>(bitsSize);
-    std::fill_n(m_processedItemStates.get(), bitsSize, 0);
+    m_processedItemStates = BitArray(maxItemsCount, false);
 }
 
 bool ImGuiApp::ProcessedState::set_item_processed(IndexT index)
 {
-    assert(index < m_processedItems.capacity());
-
-    const IndexT bitIndex = index / 8;
-    const uint8_t bitField = (1 << (index % 8));
-
-    if (m_processedItemStates[bitIndex] & bitField)
+    if (m_processedItemStates.get(index))
         return false;
 
     m_processedItems.push_back(index);
-    m_processedItemStates[bitIndex] |= bitField;
+    m_processedItemStates.set(index);
     return true;
 }
 

@@ -190,6 +190,7 @@ target_sources(unassemblize PRIVATE
     src/imguiclient/utility/imgui_scoped.h
     src/imguiclient/utility/imgui_text_filter.cpp
     src/imguiclient/utility/imgui_text_filter.h
+    src/util/bitarray.h
 )
 
 # Platform-specific configurations
