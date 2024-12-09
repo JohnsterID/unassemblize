@@ -880,6 +880,24 @@ bool ImGuiApp::ProgramComparisonDescriptor::bundles_ready() const
     return count == m_files.size();
 }
 
+bool ImGuiApp::ProgramComparisonDescriptor::matched_functions_disassembled(span<const IndexT> matchedFunctionIndices) const
+{
+    for (IndexT matchedFunctionIndex : matchedFunctionIndices)
+    {
+        const MatchedFunction &matchedFunction = m_matchedFunctions[matchedFunctionIndex];
+
+        for (IndexT i = 0; i < 2; ++i)
+        {
+            const IndexT namedFunctionIndex = matchedFunction.named_idx_pair[i];
+            const NamedFunction &namedFunction = m_files[i].m_revisionDescriptor->m_namedFunctions[namedFunctionIndex];
+
+            if (!namedFunction.is_disassembled())
+                return false;
+        }
+    }
+    return true;
+}
+
 void ImGuiApp::ProgramComparisonDescriptor::update_selected_matched_functions()
 {
     assert(named_functions_built());
@@ -1942,6 +1960,7 @@ void ImGuiApp::process_named_and_matched_functions_async(
                         if (--(*sharedWorkCount) == 0)
                         {
                             --comparisonDescriptor->m_pendingBuildComparisonRecordsCommands;
+                            assert(comparisonDescriptor->matched_functions_disassembled(matchedFunctionIndices));
                             process_matched_functions_async(comparisonDescriptor, matchedFunctionIndices);
                         }
                         return nullptr;
@@ -1951,11 +1970,16 @@ void ImGuiApp::process_named_and_matched_functions_async(
             }
         }
     }
-    else
+    else if (comparisonDescriptor->matched_functions_disassembled(matchedFunctionIndices))
     {
         // Named functions are already processed. Proceed with the matched functions.
 
         process_matched_functions_async(comparisonDescriptor, matchedFunctionIndices);
+    }
+    else
+    {
+        // Something else has started the processing of named function but they are not yet finished.
+        // #TODO: Add a scheduler or message or something.
     }
 }
 

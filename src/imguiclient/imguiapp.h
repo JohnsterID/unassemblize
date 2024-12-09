@@ -413,6 +413,8 @@ class ImGuiApp
         bool matched_functions_built() const;
         bool bundles_ready() const;
 
+        bool matched_functions_disassembled(span<const IndexT> matchedFunctionIndices) const;
+
         // Requires prior call(s) to File::update_selected_functions()
         void update_selected_matched_functions();
 
@@ -524,11 +526,11 @@ private:
         ProgramFileRevisionDescriptorPtr &revisionDescriptor,
         span<const IndexT> namedFunctionIndices);
 
-    void process_named_and_matched_functions_async(
+    void process_matched_functions_async(
         ProgramComparisonDescriptor *comparisonDescriptor,
         span<const IndexT> matchedFunctionIndices);
 
-    void process_matched_functions_async(
+    void process_named_and_matched_functions_async(
         ProgramComparisonDescriptor *comparisonDescriptor,
         span<const IndexT> matchedFunctionIndices);
 
