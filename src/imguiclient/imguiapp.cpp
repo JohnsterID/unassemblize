@@ -1920,6 +1920,18 @@ void ImGuiApp::process_named_functions_async(
     m_workQueue.enqueue(std::move(command));
 }
 
+void ImGuiApp::process_matched_functions_async(
+    ProgramComparisonDescriptor *comparisonDescriptor,
+    span<const IndexT> matchedFunctionIndices)
+{
+    assert(comparisonDescriptor != nullptr);
+    assert(!matchedFunctionIndices.empty());
+
+    auto command =
+        create_build_comparison_records_for_selected_functions_command(comparisonDescriptor, matchedFunctionIndices);
+    m_workQueue.enqueue(std::move(command));
+}
+
 void ImGuiApp::process_named_and_matched_functions_async(
     ProgramComparisonDescriptor *comparisonDescriptor,
     span<const IndexT> matchedFunctionIndices)
@@ -1981,19 +1993,6 @@ void ImGuiApp::process_named_and_matched_functions_async(
         // Something else has started the processing of named function but they are not yet finished.
         // #TODO: Add a scheduler or message or something.
     }
-}
-
-void ImGuiApp::process_matched_functions_async(
-    ProgramComparisonDescriptor *comparisonDescriptor,
-    span<const IndexT> matchedFunctionIndices)
-{
-    assert(comparisonDescriptor != nullptr);
-    assert(!matchedFunctionIndices.empty());
-
-    auto command =
-        create_build_comparison_records_for_selected_functions_command(comparisonDescriptor, matchedFunctionIndices);
-
-    m_workQueue.enqueue(std::move(command));
 }
 
 void ImGuiApp::add_file()
