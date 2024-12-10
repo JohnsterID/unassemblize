@@ -307,38 +307,22 @@ void ProgramComparisonDescriptor::File::update_selected_bundles()
     std::vector<const NamedFunctionBundle *> selectedBundles;
     selectedBundles.reserve(selection.Size);
 
-    if (m_bundlesFilter.filtered.size() == activeBundles.size())
+    // Uses lookup set. Is much faster than linear search over elements.
+    const std::unordered_set<const NamedFunctionBundle *> filteredSet(
+        m_bundlesFilter.filtered.begin(),
+        m_bundlesFilter.filtered.end());
+
+    void *it = nullptr;
+    ImGuiID id;
+    while (selection.GetNextSelectedItem(&it, &id))
     {
-        // Fast route. The filter contains all elements.
-        void *it = nullptr;
-        ImGuiID id;
-        while (selection.GetNextSelectedItem(&it, &id))
-        {
-            assert(IndexT(id) < activeBundles.size());
-            const NamedFunctionBundle *bundle = &activeBundles[IndexT(id)];
-            selectedBundles.push_back(bundle);
-        }
-    }
-    else
-    {
-        // Slow route. The filter does not contain all elements.
-        // Uses lookup set. Is much faster than linear search over elements.
-        const std::unordered_set<const NamedFunctionBundle *> filteredSet(
-            m_bundlesFilter.filtered.begin(),
-            m_bundlesFilter.filtered.end());
+        assert(IndexT(id) < activeBundles.size());
+        const NamedFunctionBundle *bundle = &activeBundles[IndexT(id)];
 
-        void *it = nullptr;
-        ImGuiID id;
-        while (selection.GetNextSelectedItem(&it, &id))
-        {
-            assert(IndexT(id) < activeBundles.size());
-            const NamedFunctionBundle *bundle = &activeBundles[IndexT(id)];
+        if (filteredSet.count(bundle) == 0)
+            continue;
 
-            if (filteredSet.count(bundle) == 0)
-                continue;
-
-            selectedBundles.push_back(bundle);
-        }
+        selectedBundles.push_back(bundle);
     }
 
     m_selectedBundles = std::move(selectedBundles);
@@ -440,35 +424,19 @@ void ProgramComparisonDescriptor::File::update_selected_named_functions()
     // Reservation size typically matches selection size, but could be larger.
     selectedAllNamedFunctionIndices.reserve(m_imguiFunctionsSelection.Size);
 
-    const span<const IndexT> activeNamedFunctionIndices = get_active_named_function_indices();
+    // Uses lookup set. Is much faster than linear search over elements.
+    const std::unordered_set<IndexT> filteredSet(
+        m_functionIndicesFilter.filtered.begin(),
+        m_functionIndicesFilter.filtered.end());
 
-    if (m_functionIndicesFilter.filtered.size() == activeNamedFunctionIndices.size())
+    void *it = nullptr;
+    ImGuiID id;
+    while (m_imguiFunctionsSelection.GetNextSelectedItem(&it, &id))
     {
-        // Fast route. The filter contains all elements.
-        void *it = nullptr;
-        ImGuiID id;
-        while (m_imguiFunctionsSelection.GetNextSelectedItem(&it, &id))
-        {
-            selectedAllNamedFunctionIndices.push_back(IndexT(id));
-        }
-    }
-    else
-    {
-        // Slow route. The filter does not contain all elements.
-        // Uses lookup set. Is much faster than linear search over elements.
-        const std::unordered_set<IndexT> filteredSet(
-            m_functionIndicesFilter.filtered.begin(),
-            m_functionIndicesFilter.filtered.end());
+        if (filteredSet.count(IndexT(id)) == 0)
+            continue;
 
-        void *it = nullptr;
-        ImGuiID id;
-        while (m_imguiFunctionsSelection.GetNextSelectedItem(&it, &id))
-        {
-            if (filteredSet.count(IndexT(id)) == 0)
-                continue;
-
-            selectedAllNamedFunctionIndices.push_back(IndexT(id));
-        }
+        selectedAllNamedFunctionIndices.push_back(IndexT(id));
     }
 
     m_selectedNamedFunctionIndices = std::move(selectedAllNamedFunctionIndices);
