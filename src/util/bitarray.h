@@ -1,7 +1,8 @@
 /**
  * @file
  *
- * @brief Array with bits
+ * @brief Dynamic Bit Array to store and access bits with indices.
+ *        Prefer using this over std::vector<bool> for space efficiency.
  *
  * @copyright Unassemblize is free software: you can redistribute it and/or
  *            modify it under the terms of the GNU General Public License
@@ -12,45 +13,45 @@
  */
 #pragma once
 
+#include <assert.h>
 #include <cstdint>
 #include <memory>
 
 class BitArray
 {
 public:
+    struct BitIndexer
+    {
+        friend class BitArray;
+
+    private:
+        BitIndexer(uint32_t bitIndex, uint8_t bitMask) : m_bitIndex(bitIndex), m_bitMask(bitMask) {}
+
+        uint32_t m_bitIndex : 24;
+        uint32_t m_bitMask : 8;
+    };
+
     BitArray() = default;
 
-    BitArray(size_t size, bool defaultValue) : m_size(size)
+    BitArray(uint32_t size, bool defaultValue = false) : m_size(size)
     {
-        const size_t bitsSize = m_size / 8 + 1;
+        assert(m_size < (1 << 24)); // Has this limit to offer compact BitIndexer.
+        const uint32_t bitsSize = m_size / 8 + 1;
         m_bitArray = std::make_unique<uint8_t[]>(bitsSize);
         std::fill_n(m_bitArray.get(), bitsSize, defaultValue);
     }
 
-    void set(size_t index)
-    {
-        const size_t bitIndex = index / 8;
-        const uint8_t bitField = (1 << (index % 8));
-        m_bitArray[bitIndex] |= bitField;
-    }
+    bool is_set(BitIndexer indexer) const { return (m_bitArray[indexer.m_bitIndex] & indexer.m_bitMask) != uint8_t(0); }
 
-    void unset(size_t index)
-    {
-        const size_t bitIndex = index / 8;
-        const uint8_t bitField = (1 << (index % 8));
-        m_bitArray[bitIndex] &= ~bitField;
-    }
+    void set(BitIndexer indexer) { m_bitArray[indexer.m_bitIndex] |= indexer.m_bitMask; }
 
-    bool get(size_t index) const
-    {
-        const size_t bitIndex = index / 8;
-        const uint8_t bitField = (1 << (index % 8));
-        return (m_bitArray[bitIndex] & bitField) != uint8_t(0);
-    }
+    void unset(BitIndexer indexer) { m_bitArray[indexer.m_bitIndex] &= ~indexer.m_bitMask; }
 
-    size_t size() const { return m_size; }
+    BitIndexer get_indexer(uint32_t index) const { return BitIndexer(index / 8, 1 << (index % 8)); }
+
+    uint32_t size() const { return m_size; }
 
 private:
     std::unique_ptr<uint8_t[]> m_bitArray;
-    size_t m_size = 0;
+    uint32_t m_size = 0;
 };

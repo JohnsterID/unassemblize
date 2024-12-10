@@ -23,11 +23,15 @@ void ProcessedState::init(size_t maxItemsCount)
 
 bool ProcessedState::set_item_processed(IndexT index)
 {
-    if (m_processedItemStates.get(index))
+    assert(index < m_processedItemStates.size());
+
+    const BitArray::BitIndexer bitIndexer = m_processedItemStates.get_indexer(index);
+
+    if (m_processedItemStates.is_set(bitIndexer))
         return false;
 
     m_processedItems.push_back(index);
-    m_processedItemStates.set(index);
+    m_processedItemStates.set(bitIndexer);
     return true;
 }
 
