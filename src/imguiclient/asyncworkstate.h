@@ -13,6 +13,7 @@
 #pragma once
 
 #include "commontypes.h"
+#include "util.h"
 #include "workqueue.h"
 
 namespace unassemblize::gui
