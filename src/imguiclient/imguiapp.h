@@ -45,6 +45,11 @@ class ImGuiApp
         ImGuiTableFlags_NoHostExtendX |
         ImGuiTableFlags_ScrollX |
         ImGuiTableFlags_ScrollY;
+
+    static constexpr ImGuiTableFlags ComparisonSplitTableFlags =
+        ImGuiTableFlags_SizingStretchSame |
+        ImGuiTableFlags_NoBordersInBody |
+        ImGuiTableFlags_NoPadOuterX;
     // clang-format on
 
     static constexpr uint8_t GuiBuildBundleFlags = BuildMatchedFunctionIndices | BuildAllNamedFunctionIndices;
@@ -160,10 +165,12 @@ private:
     void FileManagerDescriptorPdbFile(ProgramFileDescriptor &descriptor);
     void FileManagerDescriptorPdbConfig(ProgramFileDescriptor &descriptor);
     void FileManagerDescriptorActions(ProgramFileDescriptor &descriptor, bool &erased);
+    void FileManagerDescriptorProgressOverlay(const ProgramFileDescriptor &descriptor, const ImRect &rect);
     void FileManagerDescriptorSaveLoadStatus(const ProgramFileRevisionDescriptor &descriptor);
     void FileManagerDescriptorLoadStatus(const ProgramFileRevisionDescriptor &descriptor);
     void FileManagerDescriptorSaveStatus(const ProgramFileRevisionDescriptor &descriptor);
     void FileManagerGlobalButtons();
+    void FileManagerInfoNode(ProgramFileDescriptor &fileDescriptor, const ProgramFileRevisionDescriptor &revisionDescriptor);
     void FileManagerInfo(ProgramFileDescriptor &fileDescriptor, const ProgramFileRevisionDescriptor &revisionDescriptor);
     void FileManagerInfoExeSections(const ProgramFileRevisionDescriptor &descriptor);
     void FileManagerInfoExeSymbols(
@@ -182,7 +189,21 @@ private:
     void OutputManagerBody();
 
     void ComparisonManagerBody(ProgramComparisonDescriptor &descriptor);
-    void ComparisonManagerProgramFileSelection(ProgramComparisonDescriptor::File &file);
+    void ComparisonManagerFilesHeaders();
+    void ComparisonManagerFilesLists(ProgramComparisonDescriptor &descriptor);
+    void ComparisonManagerFilesList(ProgramComparisonDescriptor::File &file);
+    void ComparisonManagerFilesActions(ProgramComparisonDescriptor &descriptor);
+    void ComparisonManagerFilesProgressOverlay(const ProgramComparisonDescriptor &descriptor, const ImRect &rect);
+    void ComparisonManagerFilesStatus(const ProgramComparisonDescriptor &descriptor);
+    void ComparisonManagerBundlesSettings(ProgramComparisonDescriptor &descriptor);
+    void ComparisonManagerBundlesTypeSelection(ProgramComparisonDescriptor::File &file);
+    void ComparisonManagerBundlesFilter(ProgramComparisonDescriptor::File &file);
+    void ComparisonManagerBundlesLists(ProgramComparisonDescriptor &descriptor);
+    void ComparisonManagerBundlesList(ProgramComparisonDescriptor::File &file);
+    void ComparisonManagerFunctionsSettings(ProgramComparisonDescriptor &descriptor);
+    void ComparisonManagerFunctionsFilter(ProgramComparisonDescriptor &descriptor, ProgramComparisonDescriptor::File &file);
+    void ComparisonManagerFunctionsLists(ProgramComparisonDescriptor &descriptor);
+    void ComparisonManagerFunctionsList(ProgramComparisonDescriptor &descriptor, ProgramComparisonDescriptor::File &file);
     void ComparisonManagerItemListStyleColor(
         ScopedStyleColor &styleColor,
         const ProgramComparisonDescriptor::File::ListItemUiInfo &uiInfo);
