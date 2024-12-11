@@ -14,7 +14,6 @@
 
 #include "utility/imgui_misc.h"
 #include "utility/imgui_text_filter.h"
-#include <imgui.h>
 
 #include "programcomparisondescriptor.h"
 #include "programfiledescriptor.h"

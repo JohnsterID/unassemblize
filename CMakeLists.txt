@@ -184,6 +184,7 @@ target_sources(unassemblize PRIVATE
     src/workqueue.cpp
     src/workqueue.h
     src/imguiclient/asyncworkstate.h
+    src/imguiclient/imconfig.h # TODO: Is this file actually used?
     src/imguiclient/imguiapp.cpp
     src/imguiclient/imguiapp.h
     src/imguiclient/processedstate.cpp
