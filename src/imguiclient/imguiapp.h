@@ -55,6 +55,7 @@ class ImGuiApp
     static constexpr uint8_t GuiBuildBundleFlags = BuildMatchedFunctionIndices | BuildAllNamedFunctionIndices;
     static constexpr ImU32 RedColor = IM_COL32(255, 0, 0, 255);
     static constexpr ImU32 GreenColor = IM_COL32(0, 255, 0, 255);
+    static constexpr ImVec2 StandardMinButtonSize = ImVec2(80, 0);
     static constexpr std::chrono::system_clock::time_point InvalidTimePoint = std::chrono::system_clock::time_point::min();
 
     using ProgramFileDescriptorPair = std::array<ProgramFileDescriptor *, 2>;
@@ -208,6 +209,7 @@ private:
         ScopedStyleColor &styleColor,
         const ProgramComparisonDescriptor::File::ListItemUiInfo &uiInfo);
 
+    static bool Button(const char *label, ImGuiButtonFlags flags = 0);
 private:
     ImVec2 m_windowPos = ImVec2(0, 0);
     ImVec2 m_windowSize = ImVec2(0, 0);

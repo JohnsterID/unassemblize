@@ -1378,7 +1378,7 @@ void ImGuiApp::FileManagerDescriptorActions(ProgramFileDescriptor &descriptor, b
         // Change text color too to make it readable with the light ImGui color theme.
         ImScoped::StyleColor text_color1(ImGuiCol_Text, ImVec4(1.00f, 1.00f, 1.00f, 1.00f));
         ImScoped::StyleColor text_color2(ImGuiCol_TextDisabled, ImVec4(0.50f, 0.50f, 0.50f, 1.00f));
-        erased = ImGui::Button("Remove");
+        erased = Button("Remove");
 
         // #TODO: Guard this button press with a confirmation dialog ?
         // There is an example for this in "Dear ImGui Demo" > "Popups & Modal windows" > "Modals".
@@ -1394,7 +1394,7 @@ void ImGuiApp::FileManagerDescriptorActions(ProgramFileDescriptor &descriptor, b
         // Change text color too to make it readable with the light ImGui color theme.
         ImScoped::StyleColor text_color1(ImGuiCol_Text, ImVec4(1.00f, 1.00f, 1.00f, 1.00f));
         ImScoped::StyleColor text_color2(ImGuiCol_TextDisabled, ImVec4(0.50f, 0.50f, 0.50f, 1.00f));
-        if (ImGui::Button("Load"))
+        if (Button("Load"))
         {
             load_async(&descriptor);
         }
@@ -1409,7 +1409,7 @@ void ImGuiApp::FileManagerDescriptorActions(ProgramFileDescriptor &descriptor, b
         // Change text color too to make it readable with the light ImGui color theme.
         ImScoped::StyleColor text_color1(ImGuiCol_Text, ImVec4(1.00f, 1.00f, 1.00f, 1.00f));
         ImScoped::StyleColor text_color2(ImGuiCol_TextDisabled, ImVec4(0.50f, 0.50f, 0.50f, 1.00f));
-        if (ImGui::Button("Save Config"))
+        if (Button("Save Config"))
         {
             save_config_async(&descriptor);
         }
@@ -1482,7 +1482,7 @@ void ImGuiApp::FileManagerDescriptorSaveStatus(const ProgramFileRevisionDescript
 
 void ImGuiApp::FileManagerGlobalButtons()
 {
-    if (ImGui::Button("Add File"))
+    if (Button("Add File"))
     {
         add_file();
     }
@@ -1501,10 +1501,12 @@ void ImGuiApp::FileManagerGlobalButtons()
         // Change text color too to make it readable with the light ImGui color theme.
         ImScoped::StyleColor text_color1(ImGuiCol_Text, ImVec4(1.00f, 1.00f, 1.00f, 1.00f));
         ImScoped::StyleColor text_color2(ImGuiCol_TextDisabled, ImVec4(0.50f, 0.50f, 0.50f, 1.00f));
-        if (ImGui::Button("Load All"))
+        if (Button("Load All"))
         {
             for (ProgramFileDescriptorPtr &descriptor : m_programFiles)
             {
+                if (!descriptor->can_load())
+                    continue;
                 load_async(descriptor.get());
             }
         }
@@ -2038,13 +2040,13 @@ void ImGuiApp::ComparisonManagerFilesActions(ProgramComparisonDescriptor &descri
         const bool canCompare1 = fileDescriptor1->can_load() || fileDescriptor1->exe_loaded();
         ImScoped::Disabled disabled(!(canCompare0 && canCompare1));
         // Change button color.
-        ImScoped::StyleColor color1(ImGuiCol_Button, (ImVec4)ImColor::HSV(0.8f, 0.6f, 0.6f));
-        ImScoped::StyleColor color2(ImGuiCol_ButtonHovered, (ImVec4)ImColor::HSV(0.8f, 0.8f, 0.8f));
-        ImScoped::StyleColor color3(ImGuiCol_ButtonActive, (ImVec4)ImColor::HSV(0.8f, 1.0f, 1.0f));
+        ImScoped::StyleColor color1(ImGuiCol_Button, (ImVec4)ImColor::HSV(0.5f, 0.6f, 0.6f));
+        ImScoped::StyleColor color2(ImGuiCol_ButtonHovered, (ImVec4)ImColor::HSV(0.5f, 0.8f, 0.8f));
+        ImScoped::StyleColor color3(ImGuiCol_ButtonActive, (ImVec4)ImColor::HSV(0.5f, 1.0f, 1.0f));
         // Change text color too to make it readable with the light ImGui color theme.
         ImScoped::StyleColor text_color1(ImGuiCol_Text, ImVec4(1.00f, 1.00f, 1.00f, 1.00f));
         ImScoped::StyleColor text_color2(ImGuiCol_TextDisabled, ImVec4(0.50f, 0.50f, 0.50f, 1.00f));
-        if (ImGui::Button("Compare"))
+        if (Button("Compare"))
         {
             load_and_init_comparison_async({fileDescriptor0, fileDescriptor1}, &descriptor);
         }
@@ -2434,6 +2436,26 @@ void ImGuiApp::ComparisonManagerItemListStyleColor(
     styleColor.PushStyleColor(ImGuiCol_Header, CreateColor(blendedHeaderColor, 79));
     styleColor.PushStyleColor(ImGuiCol_HeaderHovered, CreateColor(blendedHeaderColorHovered, 204));
     styleColor.PushStyleColor(ImGuiCol_HeaderActive, CreateColor(blendedHeaderColorActive, 255));
+}
+
+bool ImGuiApp::Button(const char *label, ImGuiButtonFlags flags)
+{
+    ImGuiWindow *window = ImGui::GetCurrentWindow();
+    if (window->SkipItems)
+        return false;
+
+    const ImGuiStyle &style = GImGui->Style;
+    const ImVec2 labelSize = ImGui::CalcTextSize(label, NULL, true);
+    ImVec2 size;
+    if (labelSize.x + style.FramePadding.x * 2.0f > StandardMinButtonSize.x)
+    {
+        size = ImVec2(0, 0); // This will make ImGui auto scale it.
+    }
+    else
+    {
+        size = StandardMinButtonSize;
+    }
+    return ImGui::ButtonEx(label, size, flags);
 }
 
 } // namespace unassemblize::gui
