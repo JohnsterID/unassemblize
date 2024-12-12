@@ -50,6 +50,11 @@ class ImGuiApp
         ImGuiTableFlags_SizingStretchSame |
         ImGuiTableFlags_NoBordersInBody |
         ImGuiTableFlags_NoPadOuterX;
+
+    static constexpr ImGuiTreeNodeFlags TreeNodeHeaderFlags =
+        ImGuiTreeNodeFlags_Framed |
+        ImGuiTreeNodeFlags_NoTreePushOnOpen |
+        ImGuiTreeNodeFlags_SpanAvailWidth;
     // clang-format on
 
     static constexpr uint8_t GuiBuildBundleFlags = BuildMatchedFunctionIndices | BuildAllNamedFunctionIndices;
@@ -205,11 +210,15 @@ private:
     void ComparisonManagerFunctionsFilter(ProgramComparisonDescriptor &descriptor, ProgramComparisonDescriptor::File &file);
     void ComparisonManagerFunctionsLists(ProgramComparisonDescriptor &descriptor);
     void ComparisonManagerFunctionsList(ProgramComparisonDescriptor &descriptor, ProgramComparisonDescriptor::File &file);
-    void ComparisonManagerItemListStyleColor(
+    static void ComparisonManagerItemListStyleColor(
         ScopedStyleColor &styleColor,
         const ProgramComparisonDescriptor::File::ListItemUiInfo &uiInfo);
 
     static bool Button(const char *label, ImGuiButtonFlags flags = 0);
+    static bool TreeNodeHeader(const char *label, ImGuiTreeNodeFlags flags = 0);
+    static bool TreeNodeHeader(const char *str_id, ImGuiTreeNodeFlags flags, const char *fmt, ...) IM_FMTARGS(3);
+    static void TreeNodeHeaderStyleColor(ScopedStyleColor &styleColor);
+
 private:
     ImVec2 m_windowPos = ImVec2(0, 0);
     ImVec2 m_windowSize = ImVec2(0, 0);

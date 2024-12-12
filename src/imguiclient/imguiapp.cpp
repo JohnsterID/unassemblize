@@ -1188,7 +1188,7 @@ void ImGuiApp::FileManagerBody()
 
     if (show_files && m_showFileManagerWithTabs)
     {
-        show_files = ImGui::BeginTabBar("file_tabs");
+        show_files = ImGui::BeginTabBar("##file_tabs");
     }
 
     if (show_files)
@@ -1215,7 +1215,7 @@ void ImGuiApp::FileManagerBody()
             else
             {
                 const std::string title = descriptor.create_descriptor_name_with_file_info();
-                is_open = ImGui::TreeNodeEx("file_tree", ImGuiTreeNodeFlags_DefaultOpen, title.c_str());
+                is_open = TreeNodeHeader("##file_tree", ImGuiTreeNodeFlags_DefaultOpen, title.c_str());
             }
 
             if (is_open)
@@ -1228,10 +1228,6 @@ void ImGuiApp::FileManagerBody()
                 if (m_showFileManagerWithTabs)
                 {
                     ImGui::EndTabItem();
-                }
-                else
-                {
-                    ImGui::TreePop();
                 }
             }
         }
@@ -1275,7 +1271,6 @@ void ImGuiApp::FileManagerDescriptor(ProgramFileDescriptor &descriptor, bool &er
         FileManagerInfoNode(descriptor, *revisionDescriptor);
     }
 
-    ImGui::Spacing();
     ImGui::Spacing();
 }
 
@@ -1519,7 +1514,7 @@ void ImGuiApp::FileManagerInfoNode(
 {
     if (revisionDescriptor.m_executable != nullptr || revisionDescriptor.m_pdbReader != nullptr)
     {
-        ImScoped::TreeNode tree("Info");
+        ImScoped::TreeNodeEx tree("Info", ImGuiTreeNodeFlags_SpanAvailWidth);
         if (tree.IsOpen)
         {
             FileManagerInfo(fileDescriptor, revisionDescriptor);
@@ -1939,26 +1934,35 @@ void ImGuiApp::ComparisonManagerBody(ProgramComparisonDescriptor &descriptor)
 {
     // #TODO: Add clippers to lists and tables.
 
+    if (TreeNodeHeader("Files", ImGuiTreeNodeFlags_DefaultOpen))
     {
-        ComparisonManagerFilesHeaders();
+        {
+            ComparisonManagerFilesHeaders();
 
-        ImScoped::Group group;
-        ImScoped::Disabled disabled(descriptor.has_async_work());
+            ImScoped::Group group;
+            ImScoped::Disabled disabled(descriptor.has_async_work());
 
-        ComparisonManagerFilesLists(descriptor);
-        ComparisonManagerFilesActions(descriptor);
+            ComparisonManagerFilesLists(descriptor);
+            ComparisonManagerFilesActions(descriptor);
+        }
+        const ImRect groupRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+        ComparisonManagerFilesProgressOverlay(descriptor, groupRect);
+        ComparisonManagerFilesStatus(descriptor);
     }
-
-    const ImRect groupRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
-    ComparisonManagerFilesProgressOverlay(descriptor, groupRect);
-    ComparisonManagerFilesStatus(descriptor);
 
     if (descriptor.bundles_ready())
     {
-        ComparisonManagerBundlesSettings(descriptor);
-        ComparisonManagerBundlesLists(descriptor);
-        ComparisonManagerFunctionsSettings(descriptor);
-        ComparisonManagerFunctionsLists(descriptor);
+        if (TreeNodeHeader("Bundles", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ComparisonManagerBundlesSettings(descriptor);
+            ComparisonManagerBundlesLists(descriptor);
+        }
+
+        if (TreeNodeHeader("Functions", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ComparisonManagerFunctionsSettings(descriptor);
+            ComparisonManagerFunctionsLists(descriptor);
+        }
     }
 }
 
@@ -2456,6 +2460,31 @@ bool ImGuiApp::Button(const char *label, ImGuiButtonFlags flags)
         size = StandardMinButtonSize;
     }
     return ImGui::ButtonEx(label, size, flags);
+}
+
+bool ImGuiApp::TreeNodeHeader(const char *label, ImGuiTreeNodeFlags flags)
+{
+    ScopedStyleColor styleColor;
+    TreeNodeHeaderStyleColor(styleColor);
+    return ImGui::TreeNodeEx(label, flags | TreeNodeHeaderFlags);
+}
+
+bool ImGuiApp::TreeNodeHeader(const char *str_id, ImGuiTreeNodeFlags flags, const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    ScopedStyleColor styleColor;
+    TreeNodeHeaderStyleColor(styleColor);
+    bool isOpen = ImGui::TreeNodeExV(str_id, flags | TreeNodeHeaderFlags, fmt, args);
+    va_end(args);
+    return isOpen;
+}
+
+void ImGuiApp::TreeNodeHeaderStyleColor(ScopedStyleColor &styleColor)
+{
+    styleColor.PushStyleColor(ImGuiCol_Header, IM_COL32(0xDB, 0x61, 0x40, 150));
+    styleColor.PushStyleColor(ImGuiCol_HeaderHovered, IM_COL32(0xDB, 0x61, 0x40, 204));
+    styleColor.PushStyleColor(ImGuiCol_HeaderActive, IM_COL32(0xDB, 0x61, 0x40, 255));
 }
 
 } // namespace unassemblize::gui
