@@ -12,6 +12,7 @@
  */
 #pragma once
 
+#include "util/nocopy.h"
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <string>
@@ -25,7 +26,7 @@ struct WindowPlacement
     ImVec2 size = ImVec2(-FLT_MAX, -FLT_MAX);
 };
 
-struct ScopedStyleColor
+struct ScopedStyleColor : NoCopyNoMove
 {
     ScopedStyleColor() = default;
     ~ScopedStyleColor();
