@@ -45,7 +45,7 @@ span<const IndexT> ProcessedState::get_processed_items(size_t begin, size_t end)
     assert(begin <= end);
     assert(end <= m_processedItems.size());
 
-    return span<const IndexT>{m_processedItems.data() + begin, m_processedItems.data() + end};
+    return span<const IndexT>(m_processedItems.data() + begin, end - begin);
 }
 
 span<const IndexT> ProcessedState::get_items_for_processing(span<const IndexT> items)

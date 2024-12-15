@@ -17,7 +17,7 @@
 #include <string_view>
 
 // When output is set to "auto", then output name is chosen for input file name.
-inline constexpr char *const auto_str = "auto";
+inline constexpr const char *const auto_str = "auto";
 bool is_auto_str(const std::string &str);
 
 enum class InputType
@@ -27,7 +27,7 @@ enum class InputType
     None,
 };
 
-inline constexpr char *const s_input_type_names[] = {"exe", "pdb", "none"};
+inline constexpr const char *const s_input_type_names[] = {"exe", "pdb", "none"};
 
 std::string get_config_file_name(const std::string &input_file, const std::string &config_file);
 std::string get_asm_output_file_name(const std::string &input_file, const std::string &output_file);
