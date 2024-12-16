@@ -828,6 +828,7 @@ void Function::disassemble(const FunctionSetup &setup)
         const Address64T instruction_address = runtime_address;
         const Address64T instruction_section_offset = section_offset;
 
+        bool isJumpedTo = false;
         {
             const ExeSymbol *symbol = get_symbol(instruction_address);
             if (symbol != nullptr)
@@ -836,6 +837,7 @@ void Function::disassemble(const FunctionSetup &setup)
                 asm_label.label = symbol->name;
                 m_instructions.emplace_back(std::move(asm_label));
                 ++m_labelCount;
+                isJumpedTo = true;
             }
         }
 
@@ -852,6 +854,7 @@ void Function::disassemble(const FunctionSetup &setup)
         AsmInstruction asm_instruction;
         asm_instruction.address = runtime_address;
         asm_instruction.set_bytes(section_data + instruction_section_offset, instruction.info.length);
+        asm_instruction.isJumpedTo = isJumpedTo;
 
         runtime_address += instruction.info.length;
         section_offset += instruction.info.length;
