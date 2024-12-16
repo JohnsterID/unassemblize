@@ -51,6 +51,17 @@ class ImGuiApp
         ImGuiTableFlags_NoBordersInBody |
         ImGuiTableFlags_NoPadOuterX;
 
+    static constexpr ImGuiTableFlags AssemblerTableFlags =
+        ImGuiTableFlags_Resizable |
+        ImGuiTableFlags_Reorderable |
+        ImGuiTableFlags_Hideable |
+        ImGuiTableFlags_ContextMenuInBody |
+        ImGuiTableFlags_RowBg |
+        ImGuiTableFlags_BordersOuter |
+        ImGuiTableFlags_BordersV |
+        ImGuiTableFlags_SizingFixedFit |
+        ImGuiTableFlags_ScrollX;
+
     static constexpr ImGuiTreeNodeFlags TreeNodeHeaderFlags =
         ImGuiTreeNodeFlags_Framed |
         ImGuiTreeNodeFlags_NoTreePushOnOpen |
@@ -60,6 +71,7 @@ class ImGuiApp
     static constexpr uint8_t GuiBuildBundleFlags = BuildMatchedFunctionIndices | BuildAllNamedFunctionIndices;
     static constexpr ImU32 RedColor = IM_COL32(255, 0, 0, 255);
     static constexpr ImU32 GreenColor = IM_COL32(0, 255, 0, 255);
+    static constexpr ImU32 LightGrayColor = IM_COL32(0xA0, 0xA0, 0xA0, 0xFF);
     static constexpr ImVec2 StandardMinButtonSize = ImVec2(80, 0);
     static constexpr std::chrono::system_clock::time_point InvalidTimePoint = std::chrono::system_clock::time_point::min();
 
@@ -210,9 +222,51 @@ private:
     void ComparisonManagerFunctionsFilter(ProgramComparisonDescriptor &descriptor, ProgramComparisonDescriptor::File &file);
     void ComparisonManagerFunctionsLists(ProgramComparisonDescriptor &descriptor);
     void ComparisonManagerFunctionsList(ProgramComparisonDescriptor &descriptor, ProgramComparisonDescriptor::File &file);
+
+    static void ComparisonManagerFunctionEntries(const ProgramComparisonDescriptor &descriptor);
+
+    static void ComparisonManagerMatchedFunction(
+        const ProgramComparisonDescriptor &descriptor,
+        const MatchedFunction &matchedFunction);
+    static void ComparisonManagerMatchedFunctionContentTable(
+        IndexT sideIdx,
+        const AsmComparisonRecords &records,
+        const ProgramFileRevisionDescriptor &fileRevision,
+        const NamedFunction &namedFunction);
+
+    static void ComparisonManagerNamedFunctionEntry(
+        IndexT sideIdx,
+        const ProgramFileRevisionDescriptor &fileRevision,
+        const NamedFunction &namedFunction);
+    static void ComparisonManagerNamedFunctionContentTable(
+        IndexT sideIdx,
+        const ProgramFileRevisionDescriptor &fileRevision,
+        const NamedFunction &namedFunction);
+
+    static void PrintAsmInstructionColumnsLeft(
+        std::string &buf,
+        const AsmInstruction &instruction,
+        const TextFileContent *fileContent);
+    static void PrintAsmInstructionColumnsRight(
+        std::string &buf,
+        const AsmInstruction &instruction,
+        const TextFileContent *fileContent);
+    static void PrintAsmLabelColumnsLeft(const AsmLabel &label, bool showSourceCodeColumns);
+    static void PrintAsmLabelColumnsRight(const AsmLabel &label, bool showSourceCodeColumns);
+    static bool PrintAsmInstructionSourceLine(const AsmInstruction &instruction, const TextFileContent &fileContent);
+    static bool PrintAsmInstructionSourceCode(const AsmInstruction &instruction, const TextFileContent &fileContent);
+    static bool PrintAsmInstructionBytes(std::string &buf, const AsmInstruction &instruction);
+    static void PrintAsmInstructionAddress(const AsmInstruction &instruction);
+    static bool PrintAsmInstructionAssembler(std::string &buf, const AsmInstruction &instruction);
+    static void PrintAsmLabel(const AsmLabel &label);
+
+    static void ComparisonManagerMatchedFunctionDiffSymbolTable(const AsmComparisonRecords &records);
+    static void PrintDiffSymbol(const AsmInstructionPair &instructionPair);
+
     static void ComparisonManagerItemListStyleColor(
         ScopedStyleColor &styleColor,
-        const ProgramComparisonDescriptor::File::ListItemUiInfo &uiInfo);
+        const ProgramComparisonDescriptor::File::ListItemUiInfo &uiInfo,
+        float offsetX = 0.0f);
 
     static bool Button(const char *label, ImGuiButtonFlags flags = 0);
     static bool TreeNodeHeader(const char *label, ImGuiTreeNodeFlags flags = 0);

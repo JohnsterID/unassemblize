@@ -42,6 +42,7 @@ private:
 extern WindowPlacement g_lastFileDialogPlacement;
 
 void TextUnformatted(std::string_view view);
+void TextUnformattedCenteredX(std::string_view view, float width_x = 0.f);
 
 void TooltipText(const char *fmt, ...);
 void TooltipTextV(const char *fmt, va_list args);
@@ -75,6 +76,18 @@ float GetDefaultTableHeight(size_t max_rows, size_t default_rows)
     if constexpr (TableUsesHeader)
         ++extra;
     return ImGui::GetTextLineHeightWithSpacing() * (std::min<size_t>(max_rows, default_rows) + extra);
+}
+
+// Calculate a max table height.
+template<bool TableUsesHeader = true, bool TableUsesHorizontalScroll = true>
+float GetMaxTableHeight(size_t max_rows)
+{
+    size_t extra = 0;
+    if constexpr (TableUsesHeader)
+        ++extra;
+    if constexpr (TableUsesHorizontalScroll)
+        ++extra;
+    return ImGui::GetTextLineHeightWithSpacing() * (max_rows + extra);
 }
 
 } // namespace unassemblize::gui

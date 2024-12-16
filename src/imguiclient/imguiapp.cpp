@@ -1957,6 +1957,11 @@ void ImGuiApp::ComparisonManagerBody(ProgramComparisonDescriptor &descriptor)
             ComparisonManagerFunctionsSettings(descriptor);
             ComparisonManagerFunctionsLists(descriptor);
         }
+
+        if (TreeNodeHeader("Assembler", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ComparisonManagerFunctionEntries(descriptor);
+        }
     }
 }
 
@@ -2394,9 +2399,640 @@ void ImGuiApp::ComparisonManagerFunctionsList(
     }
 }
 
+void ImGuiApp::ComparisonManagerFunctionEntries(const ProgramComparisonDescriptor &descriptor)
+{
+    using File = ProgramComparisonDescriptor::File;
+    const float treeOffsetX = ImGui::GetTreeNodeToLabelSpacing();
+
+    for (IndexT matchedFunctionIndex : descriptor.m_selectedMatchedFunctionIndices)
+    {
+        const MatchedFunction &matchedFunction = descriptor.m_matchedFunctions[matchedFunctionIndex];
+        if (!matchedFunction.is_compared())
+            continue;
+
+        const IndexT namedFunctionIndex0 = matchedFunction.named_idx_pair[0];
+        const File::NamedFunctionUiInfos &uiInfos0 = descriptor.m_files[0].m_namedFunctionUiInfos;
+        const File::NamedFunctionUiInfo &uiInfo0 = uiInfos0[namedFunctionIndex0];
+
+        ScopedStyleColor styleColor;
+        if (uiInfo0.m_similarity.has_value())
+        {
+            ComparisonManagerItemListStyleColor(styleColor, uiInfo0, treeOffsetX);
+        }
+
+        ImScoped::TreeNodeEx tree(
+            uiInfo0.m_label.c_str(),
+            ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth);
+
+        styleColor.PopAll();
+
+        if (tree.IsOpen)
+        {
+            ComparisonManagerMatchedFunction(descriptor, matchedFunction);
+        }
+    }
+
+    for (IndexT i = 0; i < 2; ++i)
+    {
+        const ProgramComparisonDescriptor::File &file = descriptor.m_files[i];
+        const ProgramFileRevisionDescriptor &revision = *file.m_revisionDescriptor;
+
+        for (IndexT namedFunctionIndex : file.m_selectedNamedFunctionIndices)
+        {
+            if (file.is_matched_function(namedFunctionIndex))
+                continue;
+
+            const NamedFunction &namedFunction = revision.m_namedFunctions[namedFunctionIndex];
+            if (!namedFunction.is_disassembled())
+                continue;
+
+            const File::NamedFunctionUiInfo &uiInfo0 = file.m_namedFunctionUiInfos[namedFunctionIndex];
+
+            ImScoped::TreeNodeEx tree(
+                uiInfo0.m_label.c_str(),
+                ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth);
+
+            if (tree.IsOpen)
+            {
+                ComparisonManagerNamedFunctionEntry(i, revision, namedFunction);
+            }
+        }
+    }
+}
+
+void ImGuiApp::ComparisonManagerMatchedFunction(
+    const ProgramComparisonDescriptor &descriptor,
+    const MatchedFunction &matchedFunction)
+{
+    assert(matchedFunction.is_compared());
+
+    const AsmComparisonRecords &records = matchedFunction.comparison.records;
+
+    // Constrain the child window to max height of the table inside.
+    // + 4 because the child tables add this much somewhere (???).
+    const float maxHeight = GetMaxTableHeight(records.size()) + 4.0f;
+    const float defaultHeight = GetDefaultTableHeight(records.size(), 10) + 4.0f;
+    ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(FLT_MAX, maxHeight));
+    ImScoped::Child resizeChild(
+        "##matched_function_resize",
+        ImVec2(0.0f, defaultHeight),
+        ImGuiChildFlags_ResizeY,
+        ImGuiWindowFlags_AlwaysVerticalScrollbar);
+
+    if (resizeChild.IsContentVisible)
+    {
+        constexpr ImGuiTableFlags comparisonTableFlags = ComparisonSplitTableFlags | ImGuiTableFlags_NoPadInnerX;
+
+        ImScoped::Table table("##matched_function_table", 3, comparisonTableFlags);
+        if (table.IsContentVisible)
+        {
+            // * 4 because column text is intended to be 4 characters wide.
+            const float cellPadding = ImGui::GetStyle().CellPadding.x;
+            const float column1Width = ImGui::GetFont()->GetCharAdvance(' ') * 4 + cellPadding * 2;
+
+            ImGui::TableSetupColumn("##column0", ImGuiTableColumnFlags_WidthStretch, 50.0f);
+            ImGui::TableSetupColumn("##column1", ImGuiTableColumnFlags_WidthFixed, column1Width);
+            ImGui::TableSetupColumn("##column2", ImGuiTableColumnFlags_WidthStretch, 50.0f);
+            ImGui::TableNextRow();
+
+            {
+                ImGui::TableNextColumn();
+
+                const IndexT side = 0;
+                ImScoped::ID id(static_cast<int>(side));
+
+                const ProgramFileRevisionDescriptor &revision = *descriptor.m_files[side].m_revisionDescriptor;
+                const IndexT namedFunctionIndex = matchedFunction.named_idx_pair[side];
+                const NamedFunction &namedFunction = revision.m_namedFunctions[namedFunctionIndex];
+                ComparisonManagerMatchedFunctionContentTable(side, records, revision, namedFunction);
+            }
+
+            {
+                ImGui::TableNextColumn();
+
+                ComparisonManagerMatchedFunctionDiffSymbolTable(records);
+            }
+
+            {
+                ImGui::TableNextColumn();
+
+                const IndexT side = 1;
+                ImScoped::ID id(static_cast<int>(side));
+
+                const ProgramFileRevisionDescriptor &revision = *descriptor.m_files[side].m_revisionDescriptor;
+                const IndexT namedFunctionIndex = matchedFunction.named_idx_pair[side];
+                const NamedFunction &namedFunction = revision.m_namedFunctions[namedFunctionIndex];
+                ComparisonManagerMatchedFunctionContentTable(side, records, revision, namedFunction);
+            }
+        }
+    }
+}
+
+void ImGuiApp::ComparisonManagerMatchedFunctionContentTable(
+    IndexT sideIdx,
+    const AsmComparisonRecords &records,
+    const ProgramFileRevisionDescriptor &fileRevision,
+    const NamedFunction &namedFunction)
+{
+    assert(sideIdx < 2);
+
+    const std::string &sourceFile = namedFunction.function.get_source_file_name();
+    const TextFileContent *fileContent = fileRevision.m_fileContentStorage.find_content(sourceFile);
+    const bool showSourceCodeColumns = fileContent != nullptr;
+    int columnCount = 5;
+    if (!showSourceCodeColumns)
+        columnCount -= 2;
+
+    const ImVec2 tableSize(0.0f, GetMaxTableHeight(records.size()));
+    ImScoped::Table table("##function_assembler_table", columnCount, AssemblerTableFlags, tableSize);
+    if (table.IsContentVisible)
+    {
+        std::string buf; // #TODO: Make stack allocation ?
+        buf.reserve(1024);
+        const bool leftSide = sideIdx == 0;
+        const auto PrintAsmInstructionColumns = leftSide ? PrintAsmInstructionColumnsLeft : PrintAsmInstructionColumnsRight;
+        const auto PrintAsmLabelColumns = leftSide ? PrintAsmLabelColumnsLeft : PrintAsmLabelColumnsRight;
+
+        // #TODO: Add feature to auto hide columns by default.
+        // #TODO: Add feature to change default or current width of columns.
+        // #TODO: Simplify this. Put in a struct maybe. Have array of elements that can be ordered.
+        if (leftSide)
+        {
+            if (showSourceCodeColumns)
+            {
+                ImGui::TableSetupColumn("Line");
+                ImGui::TableSetupColumn("Source Code");
+            }
+            ImGui::TableSetupColumn("Bytes");
+            ImGui::TableSetupColumn("Address");
+            ImGui::TableSetupColumn("Assembler");
+        }
+        else
+        {
+            ImGui::TableSetupColumn("Address");
+            ImGui::TableSetupColumn("Assembler");
+            ImGui::TableSetupColumn("Bytes");
+            if (showSourceCodeColumns)
+            {
+                ImGui::TableSetupColumn("Line");
+                ImGui::TableSetupColumn("Source Code");
+            }
+        }
+        ImGui::TableHeadersRow();
+
+        ImGuiListClipper clipper;
+        clipper.Begin(records.size());
+
+        while (clipper.Step())
+        {
+            for (int n = clipper.DisplayStart; n < clipper.DisplayEnd; ++n)
+            {
+                ImGui::TableNextRow();
+
+                const AsmComparisonRecord &record = records[n];
+                if (const AsmInstructionPair *instructionPair = std::get_if<AsmInstructionPair>(&record))
+                {
+                    if (const AsmInstruction *instruction = instructionPair->pair[sideIdx])
+                    {
+                        PrintAsmInstructionColumns(buf, *instruction, fileContent);
+                        continue;
+                    }
+                }
+                else if (const AsmLabelPair *labelPair = std::get_if<AsmLabelPair>(&record))
+                {
+                    if (const AsmLabel *label = labelPair->pair[sideIdx])
+                    {
+                        PrintAsmLabelColumns(*label, showSourceCodeColumns);
+                        continue;
+                    }
+                }
+
+                // Add empty columns with dummy texts to satisfy the clipper.
+                for (int i = 0; i < columnCount; ++i)
+                {
+                    ImGui::TableNextColumn();
+                    TextUnformatted(" ");
+                }
+            }
+        }
+    }
+}
+
+void ImGuiApp::ComparisonManagerNamedFunctionEntry(
+    IndexT sideIdx,
+    const ProgramFileRevisionDescriptor &fileRevision,
+    const NamedFunction &namedFunction)
+{
+    assert(sideIdx < 2);
+    assert(namedFunction.is_disassembled());
+
+    const AsmInstructionVariants &records = namedFunction.function.get_instructions();
+
+    // Constrain the child window to max height of the table inside.
+    // + 4 because the child tables add this much somewhere (???).
+    const float maxHeight = GetMaxTableHeight(records.size()) + 4.0f;
+    const float defaultHeight = GetDefaultTableHeight(records.size(), 10) + 4.0f;
+    ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(FLT_MAX, maxHeight));
+    ImScoped::Child resizeChild(
+        "##matched_function_resize",
+        ImVec2(0.0f, defaultHeight),
+        ImGuiChildFlags_ResizeY,
+        ImGuiWindowFlags_NoScrollbar);
+
+    if (resizeChild.IsContentVisible)
+    {
+        constexpr ImGuiTableFlags comparisonTableFlags = ComparisonSplitTableFlags | ImGuiTableFlags_NoPadInnerX;
+        // Subtracts scrollbar width from table width to look consistent with the table of the matched function.
+        const float availableWidth = ImGui::GetContentRegionAvail().x;
+        const float scrollbarWidth = ImGui::GetStyle().ScrollbarSize;
+        ImVec2 tableSize(availableWidth - scrollbarWidth, 0.0f);
+        ImScoped::Table table("##matched_function_table", 3, comparisonTableFlags, tableSize);
+        if (table.IsContentVisible)
+        {
+            // * 4 because column text is intended to be 4 characters wide.
+            const float cellPadding = ImGui::GetStyle().CellPadding.x;
+            const float column1Width = ImGui::GetFont()->GetCharAdvance(' ') * 4 + cellPadding * 2;
+
+            // Creates 3 (invisible) columns to look consistent with the table of the matched function.
+            ImGui::TableSetupColumn("##column0", ImGuiTableColumnFlags_WidthStretch, 50.0f);
+            ImGui::TableSetupColumn("##column1", ImGuiTableColumnFlags_WidthFixed, column1Width);
+            ImGui::TableSetupColumn("##column2", ImGuiTableColumnFlags_WidthStretch, 50.0f);
+            ImGui::TableNextRow();
+
+            const bool leftSide = sideIdx == 0;
+
+            ImGui::TableSetColumnIndex(leftSide ? 0 : 2);
+            ComparisonManagerNamedFunctionContentTable(sideIdx, fileRevision, namedFunction);
+        }
+    }
+}
+
+void ImGuiApp::ComparisonManagerNamedFunctionContentTable(
+    IndexT sideIdx,
+    const ProgramFileRevisionDescriptor &fileRevision,
+    const NamedFunction &namedFunction)
+{
+    const AsmInstructionVariants &records = namedFunction.function.get_instructions();
+    const std::string &sourceFile = namedFunction.function.get_source_file_name();
+    const TextFileContent *fileContent = fileRevision.m_fileContentStorage.find_content(sourceFile);
+    const bool showSourceCodeColumns = fileContent != nullptr;
+    int columnCount = 5;
+    if (!showSourceCodeColumns)
+        columnCount -= 2;
+
+    ImScoped::Table table("##function_assembler_table", columnCount, AssemblerTableFlags | ImGuiTableFlags_ScrollY);
+    if (table.IsContentVisible)
+    {
+        std::string buf; // #TODO: Make stack allocation ?
+        buf.reserve(1024);
+        const bool leftSide = sideIdx == 0;
+        const auto PrintAsmInstructionColumns = leftSide ? PrintAsmInstructionColumnsLeft : PrintAsmInstructionColumnsRight;
+        const auto PrintAsmLabelColumns = leftSide ? PrintAsmLabelColumnsLeft : PrintAsmLabelColumnsRight;
+
+        ImGui::TableSetupScrollFreeze(0, 1); // Makes top row always visible.
+
+        // #TODO: Simplify this. Put in a struct maybe. Have array of elements that can be ordered.
+        if (leftSide)
+        {
+            if (showSourceCodeColumns)
+            {
+                ImGui::TableSetupColumn("Line");
+                ImGui::TableSetupColumn("Source Code");
+            }
+            ImGui::TableSetupColumn("Bytes");
+            ImGui::TableSetupColumn("Address");
+            ImGui::TableSetupColumn("Assembler");
+        }
+        else
+        {
+            ImGui::TableSetupColumn("Address");
+            ImGui::TableSetupColumn("Assembler");
+            ImGui::TableSetupColumn("Bytes");
+            if (showSourceCodeColumns)
+            {
+                ImGui::TableSetupColumn("Line");
+                ImGui::TableSetupColumn("Source Code");
+            }
+        }
+        ImGui::TableHeadersRow();
+
+        ImGuiListClipper clipper;
+        clipper.Begin(records.size());
+
+        while (clipper.Step())
+        {
+            for (int n = clipper.DisplayStart; n < clipper.DisplayEnd; ++n)
+            {
+                ImGui::TableNextRow();
+
+                const AsmInstructionVariant &record = records[n];
+                if (const AsmInstruction *instruction = std::get_if<AsmInstruction>(&record))
+                {
+                    PrintAsmInstructionColumns(buf, *instruction, fileContent);
+                }
+                else if (const AsmLabel *label = std::get_if<AsmLabel>(&record))
+                {
+                    PrintAsmLabelColumns(*label, showSourceCodeColumns);
+                }
+                else
+                {
+                    // Add empty columns with dummy texts to satisfy the clipper.
+                    for (int i = 0; i < columnCount; ++i)
+                    {
+                        ImGui::TableNextColumn();
+                        TextUnformatted(" ");
+                    }
+                }
+            }
+        }
+    }
+}
+
+void ImGuiApp::PrintAsmInstructionColumnsLeft(
+    std::string &buf,
+    const AsmInstruction &instruction,
+    const TextFileContent *fileContent)
+{
+    // Always print a character to satisfy the clipper.
+
+    const bool showSourceCodeColumns = fileContent != nullptr;
+
+    if (showSourceCodeColumns)
+    {
+        ImGui::TableNextColumn(); // Source Line
+        if (!PrintAsmInstructionSourceLine(instruction, *fileContent))
+            TextUnformatted(" ");
+
+        ImGui::TableNextColumn(); // Source Code
+        if (!PrintAsmInstructionSourceCode(instruction, *fileContent))
+            TextUnformatted(" ");
+    }
+
+    ImGui::TableNextColumn(); // Bytes
+    if (!PrintAsmInstructionBytes(buf, instruction))
+        TextUnformatted(" ");
+
+    ImGui::TableNextColumn(); // Address
+    PrintAsmInstructionAddress(instruction);
+
+    ImGui::TableNextColumn(); // Assembler
+    if (!PrintAsmInstructionAssembler(buf, instruction))
+        TextUnformatted(" ");
+}
+
+void ImGuiApp::PrintAsmInstructionColumnsRight(
+    std::string &buf,
+    const AsmInstruction &instruction,
+    const TextFileContent *fileContent)
+{
+    // Always print a character to satisfy the clipper.
+
+    const bool showSourceCodeColumns = fileContent != nullptr;
+
+    ImGui::TableNextColumn(); // Address
+    PrintAsmInstructionAddress(instruction);
+
+    ImGui::TableNextColumn(); // Assembler
+    if (!PrintAsmInstructionAssembler(buf, instruction))
+        TextUnformatted(" ");
+
+    ImGui::TableNextColumn(); // Bytes
+    if (!PrintAsmInstructionBytes(buf, instruction))
+        TextUnformatted(" ");
+
+    if (showSourceCodeColumns)
+    {
+        ImGui::TableNextColumn(); // Source Line
+        if (!PrintAsmInstructionSourceLine(instruction, *fileContent))
+            TextUnformatted(" ");
+
+        ImGui::TableNextColumn(); // Source Code
+        if (!PrintAsmInstructionSourceCode(instruction, *fileContent))
+            TextUnformatted(" ");
+    }
+}
+
+void ImGuiApp::PrintAsmLabelColumnsLeft(const AsmLabel &label, bool showSourceCodeColumns)
+{
+    // Always print a character to satisfy the clipper.
+
+    if (showSourceCodeColumns)
+    {
+        ImGui::TableNextColumn(); // Source Line
+        TextUnformatted(" ");
+        ImGui::TableNextColumn(); // Source Code
+        TextUnformatted(" ");
+    }
+    ImGui::TableNextColumn(); // Bytes
+    TextUnformatted(" ");
+    ImGui::TableNextColumn(); // Address
+    TextUnformatted(" ");
+    ImGui::TableNextColumn(); // Assembler
+    PrintAsmLabel(label);
+}
+
+void ImGuiApp::PrintAsmLabelColumnsRight(const AsmLabel &label, bool showSourceCodeColumns)
+{
+    // Always print a character to satisfy the clipper.
+
+    ImGui::TableNextColumn(); // Address
+    TextUnformatted(" ");
+    ImGui::TableNextColumn(); // Assembler
+    PrintAsmLabel(label);
+    ImGui::TableNextColumn(); // Bytes
+    TextUnformatted(" ");
+
+    if (showSourceCodeColumns)
+    {
+        ImGui::TableNextColumn(); // Source Line
+        TextUnformatted(" ");
+        ImGui::TableNextColumn(); // Source Code
+        TextUnformatted(" ");
+    }
+}
+
+bool ImGuiApp::PrintAsmInstructionSourceLine(const AsmInstruction &instruction, const TextFileContent &fileContent)
+{
+    const uint16_t lineIdx = instruction.get_line_index();
+    const bool lineOk = lineIdx < fileContent.lines.size();
+    if (lineOk)
+    {
+        if (instruction.isFirstLine)
+        {
+            ImGui::Text("%u", uint32_t(instruction.lineNumber));
+            return true;
+        }
+        else
+        {
+            ImScoped::StyleColor greyText(ImGuiCol_Text, LightGrayColor);
+            ImGui::Text("%u", uint32_t(instruction.lineNumber));
+            return true;
+        }
+    }
+    return false;
+}
+
+bool ImGuiApp::PrintAsmInstructionSourceCode(const AsmInstruction &instruction, const TextFileContent &fileContent)
+{
+    const uint16_t lineIdx = instruction.get_line_index();
+    const bool lineOk = lineIdx < fileContent.lines.size();
+    if (lineOk && instruction.isFirstLine)
+    {
+        TextUnformatted(fileContent.lines[lineIdx]);
+        return true;
+    }
+    return false;
+}
+
+bool ImGuiApp::PrintAsmInstructionBytes(std::string &buf, const AsmInstruction &instruction)
+{
+    buf.clear();
+    uint8_t b = 0;
+    for (; b < instruction.bytes.size - 1; ++b)
+    {
+        util::append_format(buf, buf.capacity() - buf.size(), "{:02x} ", instruction.bytes.elements[b]);
+    }
+    if (b < instruction.bytes.size)
+    {
+        util::append_format(buf, buf.capacity() - buf.size(), "{:02x}", instruction.bytes.elements[b]);
+    }
+    TextUnformatted(buf);
+    return !buf.empty();
+}
+
+void ImGuiApp::PrintAsmInstructionAddress(const AsmInstruction &instruction)
+{
+    ImGui::Text("%08x", down_cast<uint32_t>(instruction.address));
+}
+
+bool ImGuiApp::PrintAsmInstructionAssembler(std::string &buf, const AsmInstruction &instruction)
+{
+    constexpr std::string_view quote = "\"";
+
+    if (instruction.isInvalid)
+    {
+        TextUnformatted("Unrecognized opcode");
+        return true;
+    }
+    else
+    {
+        buf.assign(instruction.text);
+        util::strip_inplace(buf, quote);
+        TextUnformatted(buf);
+
+        if (instruction.isJump)
+        {
+            ImGui::SameLine();
+
+            util::assign_format(buf, buf.capacity(), "{:+d} bytes", instruction.jumpLen);
+
+            ImScoped::StyleColor greyText(ImGuiCol_Text, LightGrayColor);
+            TextUnformatted(buf);
+        }
+        return !buf.empty();
+    }
+}
+
+void ImGuiApp::PrintAsmLabel(const AsmLabel &label)
+{
+    ImScoped::StyleColor greyText(ImGuiCol_Text, LightGrayColor);
+    TextUnformatted(label.label.c_str());
+    ImGui::SameLine();
+    TextUnformatted(":");
+}
+
+void ImGuiApp::ComparisonManagerMatchedFunctionDiffSymbolTable(const AsmComparisonRecords &records)
+{
+    constexpr ImGuiTableFlags tableFlags =
+        ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_SizingFixedFit;
+
+    const ImVec2 tableSize(0.0f, GetMaxTableHeight(records.size()));
+    ImScoped::Table table("##function_match_table", 1, tableFlags, tableSize);
+    if (table.IsContentVisible)
+    {
+        ImGui::TableSetupColumn("    ");
+        ImGui::TableHeadersRow();
+
+        ImGuiListClipper clipper;
+        clipper.Begin(records.size());
+
+        while (clipper.Step())
+        {
+            for (int n = clipper.DisplayStart; n < clipper.DisplayEnd; ++n)
+            {
+                ImGui::TableNextRow();
+
+                const AsmComparisonRecord &record = records[n];
+                if (const AsmInstructionPair *instructionPair = std::get_if<AsmInstructionPair>(&record))
+                {
+                    ImGui::TableNextColumn();
+                    PrintDiffSymbol(*instructionPair);
+                }
+                else
+                {
+                    // Add empty column and dummy text to satisfy the clipper.
+                    ImGui::TableNextColumn();
+                    TextUnformatted(" ");
+                }
+            }
+        }
+    }
+}
+
+void ImGuiApp::PrintDiffSymbol(const AsmInstructionPair &instructionPair)
+{
+    // #TODO: Create function to create equal status and use it here and in AsmPrinter.
+
+    constexpr std::string_view equal = "==";
+    constexpr std::string_view unequal = "xx";
+    constexpr std::string_view maybeEqual = "??";
+    constexpr std::string_view leftMissing = ">>";
+    constexpr std::string_view rightMissing = "<<";
+
+    // #TODO: Make strictness configurable.
+    const AsmMatchValue matchValue = instructionPair.mismatch_info.get_match_value(AsmMatchStrictness::Lenient);
+
+    switch (matchValue)
+    {
+        case AsmMatchValue::IsMatch:
+            TextUnformattedCenteredX(equal);
+            break;
+
+        case AsmMatchValue::IsMaybeMatch:
+            TextUnformattedCenteredX(maybeEqual);
+            break;
+
+        case AsmMatchValue::IsMismatch: {
+            const AsmInstruction *instruction0 = instructionPair.pair[0];
+            const AsmInstruction *instruction1 = instructionPair.pair[1];
+            if (instruction0 != nullptr && instruction1 != nullptr)
+            {
+                TextUnformattedCenteredX(unequal);
+            }
+            else if (instruction0 == nullptr && instruction1 != nullptr)
+            {
+                TextUnformattedCenteredX(leftMissing);
+            }
+            else if (instruction0 != nullptr && instruction1 == nullptr)
+            {
+                TextUnformattedCenteredX(rightMissing);
+            }
+            else
+            {
+                assert(false);
+            }
+            break;
+        }
+        default:
+            assert(false);
+            break;
+    }
+}
+
 void ImGuiApp::ComparisonManagerItemListStyleColor(
     ScopedStyleColor &styleColor,
-    const ProgramComparisonDescriptor::File::ListItemUiInfo &uiInfo)
+    const ProgramComparisonDescriptor::File::ListItemUiInfo &uiInfo,
+    float offsetX)
 {
     ImU32 mainColor;
 
@@ -2417,7 +3053,10 @@ void ImGuiApp::ComparisonManagerItemListStyleColor(
     // Set main color for text background.
     const ImVec2 cursorPos = ImGui::GetCursorScreenPos();
     const ImVec2 labelSize = ImGui::CalcTextSize(uiInfo.m_label.c_str(), nullptr, true);
-    const ImRect rect(cursorPos, ImVec2(cursorPos.x + labelSize.x, cursorPos.y + labelSize.y));
+    const ImRect rect(
+        ImVec2(cursorPos.x + offsetX, cursorPos.y),
+        ImVec2(cursorPos.x + labelSize.x + offsetX, cursorPos.y + labelSize.y));
+
     ImDrawList *drawList = ImGui::GetWindowDrawList();
     drawList->AddRectFilled(rect.Min, rect.Max, CreateColor(mainColor, 128));
 

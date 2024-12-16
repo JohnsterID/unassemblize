@@ -313,7 +313,7 @@ ZyanStatus Function::UnasmFormatterPrintAddressRelative(
         ZYAN_CHECK(ZydisFormatterBufferAppend(buffer, ZYDIS_TOKEN_SYMBOL));
         ZyanString *string;
         ZYAN_CHECK(ZydisFormatterBufferGetString(buffer, &string));
-        const std::string format = fmt::format("\"{:s}\"", symbol->name);
+        const std::string format = fmt::format("\"{:s}\"", symbol->name); // #TODO: Upgrade to util::assign_format
         ZYAN_CHECK(ZyanStringAppendFormat(string, format.c_str()));
         return ZYAN_STATUS_SUCCESS;
     }

@@ -51,6 +51,20 @@ void TextUnformatted(std::string_view view)
     ImGui::TextUnformatted(view.data(), view.data() + view.size());
 }
 
+void TextUnformattedCenteredX(std::string_view view, float width_x)
+{
+    if (width_x == 0.f)
+    {
+        width_x = ImGui::GetContentRegionAvail().x;
+    }
+    const ImVec2 text_size = ImGui::CalcTextSize(view.data(), view.data() + view.size());
+    const float text_x = (width_x - text_size.x) / 2.0f;
+
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + text_x);
+
+    TextUnformatted(view);
+}
+
 void TooltipText(const char *fmt, ...)
 {
     va_list args;
