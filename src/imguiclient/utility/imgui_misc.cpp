@@ -22,20 +22,28 @@ WindowPlacement g_lastFileDialogPlacement;
 
 ScopedStyleColor::~ScopedStyleColor()
 {
+    PopAll();
+}
+
+void ScopedStyleColor::Push(ImGuiCol idx, ImU32 col)
+{
+    ImGui::PushStyleColor(idx, col);
+    ++m_popStyleCount;
+}
+
+void ScopedStyleColor::Push(ImGuiCol idx, const ImVec4 &col)
+{
+    ImGui::PushStyleColor(idx, col);
+    ++m_popStyleCount;
+}
+
+void ScopedStyleColor::PopAll()
+{
     if (m_popStyleCount > 0)
+    {
         ImGui::PopStyleColor(m_popStyleCount);
-}
-
-void ScopedStyleColor::PushStyleColor(ImGuiCol idx, ImU32 col)
-{
-    ImGui::PushStyleColor(idx, col);
-    ++m_popStyleCount;
-}
-
-void ScopedStyleColor::PushStyleColor(ImGuiCol idx, const ImVec4 &col)
-{
-    ImGui::PushStyleColor(idx, col);
-    ++m_popStyleCount;
+        m_popStyleCount = 0;
+    }
 }
 
 void TextUnformatted(std::string_view view)
@@ -163,11 +171,6 @@ void DrawInTextCircle(ImU32 color)
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
     draw_list->AddCircleFilled(ImVec2(pos.x + x_radius, pos.y + y_radius), x_radius, color, 0);
     ImGui::SetCursorScreenPos(ImVec2(pos.x + font_size.x, pos.y));
-}
-
-ImVec2 OuterSizeForTable(size_t show_table_len, size_t table_len)
-{
-    return ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * std::min<size_t>(show_table_len, table_len));
 }
 
 void ApplyPlacementToNextWindow(WindowPlacement &placement)

@@ -31,8 +31,9 @@ struct ScopedStyleColor : NoCopyNoMove
     ScopedStyleColor() = default;
     ~ScopedStyleColor();
 
-    void PushStyleColor(ImGuiCol idx, ImU32 col);
-    void PushStyleColor(ImGuiCol idx, const ImVec4 &col);
+    void Push(ImGuiCol idx, ImU32 col);
+    void Push(ImGuiCol idx, const ImVec4 &col);
+    void PopAll();
 
 private:
     int m_popStyleCount = 0;
@@ -56,8 +57,6 @@ ImU32 CreateColor(ImU32 color, uint8_t alpha);
 
 void DrawInTextCircle(ImU32 color);
 
-ImVec2 OuterSizeForTable(size_t show_table_len, size_t table_len);
-
 void ApplyPlacementToNextWindow(WindowPlacement &placement);
 void FetchPlacementFromWindowByName(WindowPlacement &placement, const char *window_name);
 
@@ -67,5 +66,15 @@ void AddFileDialogButton(
     const std::string &key,
     const std::string &title,
     const char *filters);
+
+// Calculate a default table height.
+template<bool TableUsesHeader = true>
+float GetDefaultTableHeight(size_t max_rows, size_t default_rows)
+{
+    size_t extra = 0;
+    if constexpr (TableUsesHeader)
+        ++extra;
+    return ImGui::GetTextLineHeightWithSpacing() * (std::min<size_t>(max_rows, default_rows) + extra);
+}
 
 } // namespace unassemblize::gui

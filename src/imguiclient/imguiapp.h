@@ -36,13 +36,13 @@ class ImGuiApp
     // clang-format off
     static constexpr ImGuiTableFlags FileManagerInfoTableFlags =
         ImGuiTableFlags_Resizable |
+        ImGuiTableFlags_Reorderable |
         ImGuiTableFlags_Hideable |
         ImGuiTableFlags_ContextMenuInBody |
         ImGuiTableFlags_RowBg |
         ImGuiTableFlags_BordersOuter |
         ImGuiTableFlags_BordersV |
         ImGuiTableFlags_SizingFixedFit |
-        ImGuiTableFlags_NoHostExtendX |
         ImGuiTableFlags_ScrollX |
         ImGuiTableFlags_ScrollY;
 

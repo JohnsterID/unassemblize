@@ -531,7 +531,7 @@ WorkQueueCommandPtr ImGuiApp::create_load_source_files_for_selected_functions_co
 
     auto command =
         std::make_unique<AsyncLoadSourceFilesForSelectedFunctionsCommand>(LoadSourceFilesForSelectedFunctionsOptions(
-            revisionDescriptor->m_fileContentStrorage,
+            revisionDescriptor->m_fileContentStorage,
             revisionDescriptor->m_namedFunctions,
             namedFunctionIndices));
 
@@ -1557,15 +1557,14 @@ void ImGuiApp::FileManagerInfoExeSections(const ProgramFileRevisionDescriptor &d
 {
     ImGui::SeparatorText("Exe Sections");
 
-    ImGui::Text("Exe Image base: x%08x", down_cast<uint32_t>(descriptor.m_executable->image_base()));
+    ImGui::Text("Exe Image base: %08x", down_cast<uint32_t>(descriptor.m_executable->image_base()));
 
     const ExeSections &sections = descriptor.m_executable->get_sections();
 
     ImGui::Text("Count: %zu", sections.size());
 
-    const ImVec2 outer_size = OuterSizeForTable(10 + 1, sections.size() + 1);
-
-    ImScoped::Child child("exe_sections_container", outer_size, ImGuiChildFlags_ResizeY);
+    const float defaultHeight = GetDefaultTableHeight(sections.size(), 10);
+    ImScoped::Child child("exe_sections_container", ImVec2(0.0f, defaultHeight), ImGuiChildFlags_ResizeY);
     if (child.IsContentVisible)
     {
         if (ImGui::BeginTable("exe_sections", 3, FileManagerInfoTableFlags))
@@ -1581,10 +1580,10 @@ void ImGuiApp::FileManagerInfoExeSections(const ProgramFileRevisionDescriptor &d
                 ImGui::TableNextRow();
 
                 ImGui::TableNextColumn();
-                ImGui::Text("x%08x", down_cast<uint32_t>(section.address));
+                ImGui::Text("%08x", down_cast<uint32_t>(section.address));
 
                 ImGui::TableNextColumn();
-                ImGui::Text("x%08x", down_cast<uint32_t>(section.size));
+                ImGui::Text("%08x", down_cast<uint32_t>(section.size));
 
                 ImGui::TableNextColumn();
                 TextUnformatted(section.name);
@@ -1612,9 +1611,8 @@ void ImGuiApp::FileManagerInfoExeSymbols(
         ImGui::Text("Count: %d, Filtered: %d", int(symbols.size()), filtered.size());
     }
 
-    const ImVec2 outer_size = OuterSizeForTable(10 + 1, filtered.size() + 1);
-
-    ImScoped::Child child("exe_symbols_container", outer_size, ImGuiChildFlags_ResizeY);
+    const float defaultHeight = GetDefaultTableHeight(filtered.size(), 10);
+    ImScoped::Child child("exe_symbols_container", ImVec2(0.0f, defaultHeight), ImGuiChildFlags_ResizeY);
     if (child.IsContentVisible)
     {
         if (ImGui::BeginTable("exe_symbols", 3, FileManagerInfoTableFlags))
@@ -1637,10 +1635,10 @@ void ImGuiApp::FileManagerInfoExeSymbols(
                     ImGui::TableNextRow();
 
                     ImGui::TableNextColumn();
-                    ImGui::Text("x%08x", down_cast<uint32_t>(symbol.address));
+                    ImGui::Text("%08x", down_cast<uint32_t>(symbol.address));
 
                     ImGui::TableNextColumn();
-                    ImGui::Text("x%08x", down_cast<uint32_t>(symbol.size));
+                    ImGui::Text("%08x", down_cast<uint32_t>(symbol.size));
 
                     ImGui::TableNextColumn();
                     TextUnformatted(symbol.name);
@@ -1660,9 +1658,8 @@ void ImGuiApp::FileManagerInfoPdbCompilands(const ProgramFileRevisionDescriptor 
 
     ImGui::Text("Count: %zu", compilands.size());
 
-    const ImVec2 outer_size = OuterSizeForTable(10 + 1, compilands.size() + 1);
-
-    ImScoped::Child child("pdb_compilands_container", outer_size, ImGuiChildFlags_ResizeY);
+    const float defaultHeight = GetDefaultTableHeight(compilands.size(), 10);
+    ImScoped::Child child("pdb_compilands_container", ImVec2(0.0f, defaultHeight), ImGuiChildFlags_ResizeY);
     if (child.IsContentVisible)
     {
         if (ImGui::BeginTable("pdb_compilands", 1, FileManagerInfoTableFlags))
@@ -1700,9 +1697,8 @@ void ImGuiApp::FileManagerInfoPdbSourceFiles(const ProgramFileRevisionDescriptor
 
     ImGui::Text("Count: %zu", source_files.size());
 
-    const ImVec2 outer_size = OuterSizeForTable(10 + 1, source_files.size() + 1);
-
-    ImScoped::Child child("pdb_source_files_container", outer_size, ImGuiChildFlags_ResizeY);
+    const float defaultHeight = GetDefaultTableHeight(source_files.size(), 10);
+    ImScoped::Child child("pdb_source_files_container", ImVec2(0.0f, defaultHeight), ImGuiChildFlags_ResizeY);
     if (child.IsContentVisible)
     {
         if (ImGui::BeginTable("pdb_source_files", 3, FileManagerInfoTableFlags))
@@ -1787,9 +1783,8 @@ void ImGuiApp::FileManagerInfoPdbSymbols(
     if (revisionDescriptor.m_executable != nullptr)
         sections = &revisionDescriptor.m_executable->get_sections();
 
-    const ImVec2 outer_size = OuterSizeForTable(10 + 1, filtered.size() + 1);
-
-    ImScoped::Child child("pdb_symbols_container", outer_size, ImGuiChildFlags_ResizeY);
+    const float defaultHeight = GetDefaultTableHeight(filtered.size(), 10);
+    ImScoped::Child child("pdb_symbols_container", ImVec2(0.0f, defaultHeight), ImGuiChildFlags_ResizeY);
     if (child.IsContentVisible)
     {
         if (ImGui::BeginTable("pdb_symbols", 6, FileManagerInfoTableFlags))
@@ -1815,10 +1810,10 @@ void ImGuiApp::FileManagerInfoPdbSymbols(
                     ImGui::TableNextRow();
 
                     ImGui::TableNextColumn();
-                    ImGui::Text("x%08x", down_cast<uint32_t>(symbol.address.absVirtual));
+                    ImGui::Text("%08x", down_cast<uint32_t>(symbol.address.absVirtual));
 
                     ImGui::TableNextColumn();
-                    ImGui::Text("x%08x", symbol.length);
+                    ImGui::Text("%08x", symbol.length);
 
                     ImGui::TableNextColumn();
                     std::string section = create_section_string(symbol.address.section_as_index(), sections);
@@ -1866,9 +1861,8 @@ void ImGuiApp::FileManagerInfoPdbFunctions(
         ImGui::Text("Count: %d, Filtered: %d", int(functions.size()), filtered.size());
     }
 
-    const ImVec2 outer_size = OuterSizeForTable(10 + 1, filtered.size() + 1);
-
-    ImScoped::Child child("pdb_functions_container", outer_size, ImGuiChildFlags_ResizeY);
+    const float defaultHeight = GetDefaultTableHeight(filtered.size(), 10);
+    ImScoped::Child child("pdb_functions_container", ImVec2(0.0f, defaultHeight), ImGuiChildFlags_ResizeY);
     if (child.IsContentVisible)
     {
         if (ImGui::BeginTable("pdb_functions", 5, FileManagerInfoTableFlags))
@@ -1893,10 +1887,10 @@ void ImGuiApp::FileManagerInfoPdbFunctions(
                     ImGui::TableNextRow();
 
                     ImGui::TableNextColumn();
-                    ImGui::Text("x%08x", down_cast<uint32_t>(symbol.address.absVirtual));
+                    ImGui::Text("%08x", down_cast<uint32_t>(symbol.address.absVirtual));
 
                     ImGui::TableNextColumn();
-                    ImGui::Text("x%08x", symbol.length);
+                    ImGui::Text("%08x", symbol.length);
 
                     ImGui::TableNextColumn();
                     TextUnformatted(symbol.decoratedName);
@@ -1985,7 +1979,6 @@ void ImGuiApp::ComparisonManagerFilesLists(ProgramComparisonDescriptor &descript
 {
     const ImVec2 cursorPos = ImGui::GetCursorScreenPos();
     ImGui::SetCursorScreenPos(ImVec2(cursorPos.x, cursorPos.y - 5.0f)); // Hack, removes gap.
-    ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, ImGui::GetFrameHeightWithSpacing() * 3), ImVec2(FLT_MAX, FLT_MAX));
     const ImVec2 outer_size(0, ImGui::GetTextLineHeightWithSpacing() * 9);
     ImScoped::Child resizeChild("##files_list_resize", outer_size, ImGuiChildFlags_ResizeY);
     if (resizeChild.IsContentVisible)
@@ -2177,7 +2170,6 @@ void ImGuiApp::ComparisonManagerBundlesLists(ProgramComparisonDescriptor &descri
 {
     const ImVec2 cursorPos = ImGui::GetCursorScreenPos();
     ImGui::SetCursorScreenPos(ImVec2(cursorPos.x, cursorPos.y - 5.0f)); // Hack, removes gap.
-    ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, ImGui::GetFrameHeightWithSpacing() * 3), ImVec2(FLT_MAX, FLT_MAX));
     const ImVec2 defaultSize(0, ImGui::GetTextLineHeightWithSpacing() * 9);
     ImScoped::Child resizeChild("##bundles_list_resize", defaultSize, ImGuiChildFlags_ResizeY);
     if (resizeChild.IsContentVisible)
@@ -2308,6 +2300,7 @@ void ImGuiApp::ComparisonManagerFunctionsFilter(
 
     if (selectionChanged)
     {
+        // #TODO: bundles and functions are not updated if hidden and files are compared anew
         on_functions_interaction(descriptor, file);
     }
 
@@ -2323,7 +2316,6 @@ void ImGuiApp::ComparisonManagerFunctionsLists(ProgramComparisonDescriptor &desc
 {
     const ImVec2 cursorPos = ImGui::GetCursorScreenPos();
     ImGui::SetCursorScreenPos(ImVec2(cursorPos.x, cursorPos.y - 5.0f)); // Hack, removes gap.
-    ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, ImGui::GetFrameHeightWithSpacing() * 3), ImVec2(FLT_MAX, FLT_MAX));
     const ImVec2 defaultSize(0, ImGui::GetTextLineHeightWithSpacing() * 9);
     ImScoped::Child resizeChild("##functions_list_resize", defaultSize, ImGuiChildFlags_ResizeY);
     if (resizeChild.IsContentVisible)
@@ -2437,9 +2429,9 @@ void ImGuiApp::ComparisonManagerItemListStyleColor(
     const ImU32 blendedHeaderColorHovered = ImAlphaBlendColors(mainColor, CreateColor(headerColorHovered, 64));
     const ImU32 blendedHeaderColorActive = ImAlphaBlendColors(mainColor, CreateColor(headerColorActive, 64));
 
-    styleColor.PushStyleColor(ImGuiCol_Header, CreateColor(blendedHeaderColor, 79));
-    styleColor.PushStyleColor(ImGuiCol_HeaderHovered, CreateColor(blendedHeaderColorHovered, 204));
-    styleColor.PushStyleColor(ImGuiCol_HeaderActive, CreateColor(blendedHeaderColorActive, 255));
+    styleColor.Push(ImGuiCol_Header, CreateColor(blendedHeaderColor, 79));
+    styleColor.Push(ImGuiCol_HeaderHovered, CreateColor(blendedHeaderColorHovered, 204));
+    styleColor.Push(ImGuiCol_HeaderActive, CreateColor(blendedHeaderColorActive, 255));
 }
 
 bool ImGuiApp::Button(const char *label, ImGuiButtonFlags flags)
@@ -2482,9 +2474,9 @@ bool ImGuiApp::TreeNodeHeader(const char *str_id, ImGuiTreeNodeFlags flags, cons
 
 void ImGuiApp::TreeNodeHeaderStyleColor(ScopedStyleColor &styleColor)
 {
-    styleColor.PushStyleColor(ImGuiCol_Header, IM_COL32(0xDB, 0x61, 0x40, 150));
-    styleColor.PushStyleColor(ImGuiCol_HeaderHovered, IM_COL32(0xDB, 0x61, 0x40, 204));
-    styleColor.PushStyleColor(ImGuiCol_HeaderActive, IM_COL32(0xDB, 0x61, 0x40, 255));
+    styleColor.Push(ImGuiCol_Header, IM_COL32(0xDB, 0x61, 0x40, 150));
+    styleColor.Push(ImGuiCol_HeaderHovered, IM_COL32(0xDB, 0x61, 0x40, 204));
+    styleColor.Push(ImGuiCol_HeaderActive, IM_COL32(0xDB, 0x61, 0x40, 255));
 }
 
 } // namespace unassemblize::gui
