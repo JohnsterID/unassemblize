@@ -52,6 +52,7 @@ struct AsmInstruction
         std::fill_n(bytes.elements.data(), bytes.elements.size(), 0);
         isJump = false;
         isInvalid = false;
+        isFirstLine = false;
         lineNumber = 0;
         jumpLen = 0;
     }
@@ -63,6 +64,7 @@ struct AsmInstruction
     BytesArray bytes;
     bool isJump : 1; // Instruction is a jump.
     bool isInvalid : 1; // Instruction was not read or formatted correctly.
+    bool isFirstLine : 1; // This instruction is the first one that corresponds to its line number.
     union
     {
         int16_t jumpLen; // Jump length in bytes.

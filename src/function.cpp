@@ -696,6 +696,7 @@ void Function::set_source_file(const PdbSourceFileInfo &source_file, const PdbSo
 
     m_sourceFileName = source_file.name;
     size_t source_line_index = 0;
+    uint16_t last_line_number = 0;
 
     for (AsmInstructionVariant &variant : m_instructions)
     {
@@ -711,6 +712,11 @@ void Function::set_source_file(const PdbSourceFileInfo &source_file, const PdbSo
                     && instruction->address < m_beginAddress + source_line.offset + source_line.length)
                 {
                     instruction->lineNumber = source_line.lineNumber;
+                    if (last_line_number != source_line.lineNumber)
+                    {
+                        instruction->isFirstLine = true;
+                        last_line_number = source_line.lineNumber;
+                    }
                     break;
                 }
             }
