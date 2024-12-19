@@ -91,7 +91,7 @@ ImGuiStatus ImGuiApp::init(const CommandLineOptions &clo)
             continue;
 
         auto descriptor = std::make_unique<ProgramFileDescriptor>();
-        InputType input_type = get_input_type(clo.input_file[i], clo.input_type[i]);
+        InputType input_type = get_input_type(clo.input_file[i].v, clo.input_type[i].v);
         switch (input_type)
         {
             case InputType::Exe:

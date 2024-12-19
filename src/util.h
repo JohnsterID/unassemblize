@@ -17,15 +17,15 @@
 #include <string_view>
 #include <vector>
 
+#define PRINTF_STRING(str) static_cast<int>(str.size()), str.data()
+
 namespace util
 {
-std::string to_utf8(const wchar_t *utf16);
-std::string to_utf8(const std::wstring &utf16);
-std::wstring to_utf16(const char *utf8);
-std::wstring to_utf16(const std::string &utf8);
-std::string get_file_ext(const std::string &file_name);
+std::string to_utf8(std::wstring_view utf16);
+std::wstring to_utf16(std::string_view utf8);
+std::string get_file_ext(std::string_view file_name);
 std::string to_hex_string(const std::vector<uint8_t> &data);
-std::string abs_path(const std::string &path);
+std::string abs_path(std::string_view path);
 
 // Efficiently strip characters in place.
 template<typename String>
