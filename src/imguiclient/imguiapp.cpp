@@ -18,6 +18,8 @@
 #include <fmt/core.h>
 #include <misc/cpp/imgui_stdlib.h>
 
+// #TODO Add tooltip markers to fields and buttons that need it.
+
 namespace unassemblize::gui
 {
 ImGuiApp::ImGuiApp()
@@ -1050,6 +1052,8 @@ std::string ImGuiApp::create_time_string(std::chrono::time_point<std::chrono::sy
 
 void ImGuiApp::BackgroundWindow()
 {
+    // #TODO: Make the background dockable somehow. There is a example in ImGui Demo > Examples > Dockspace
+
     // clang-format off
     constexpr ImGuiWindowFlags window_flags =
         ImGuiWindowFlags_NoDecoration |
@@ -2547,7 +2551,7 @@ void ImGuiApp::ComparisonManagerMatchedFunctionContentTable(
     ImScoped::Table table("##function_assembler_table", columnCount, AssemblerTableFlags, tableSize);
     if (table.IsContentVisible)
     {
-        std::string buf; // #TODO: Make stack allocation ?
+        std::string buf;
         buf.reserve(1024);
         const bool leftSide = sideIdx == 0;
         const auto PrintAsmInstructionColumns = leftSide ? PrintAsmInstructionColumnsLeft : PrintAsmInstructionColumnsRight;
@@ -2683,7 +2687,7 @@ void ImGuiApp::ComparisonManagerNamedFunctionContentTable(
     ImScoped::Table table("##function_assembler_table", columnCount, AssemblerTableFlags | ImGuiTableFlags_ScrollY);
     if (table.IsContentVisible)
     {
-        std::string buf; // #TODO: Make stack allocation ?
+        std::string buf;
         buf.reserve(1024);
         const bool leftSide = sideIdx == 0;
         const auto PrintAsmInstructionColumns = leftSide ? PrintAsmInstructionColumnsLeft : PrintAsmInstructionColumnsRight;
@@ -2890,11 +2894,11 @@ bool ImGuiApp::PrintAsmInstructionBytes(std::string &buf, const AsmInstruction &
     uint8_t b = 0;
     for (; b < instruction.bytes.size - 1; ++b)
     {
-        util::append_format(buf, buf.capacity() - buf.size(), "{:02x} ", instruction.bytes.elements[b]);
+        buf += fmt::format("{:02x} ", instruction.bytes.elements[b]);
     }
     if (b < instruction.bytes.size)
     {
-        util::append_format(buf, buf.capacity() - buf.size(), "{:02x}", instruction.bytes.elements[b]);
+        buf += fmt::format("{:02x}", instruction.bytes.elements[b]);
     }
     TextUnformatted(buf);
     return !buf.empty();
@@ -2916,7 +2920,7 @@ bool ImGuiApp::PrintAsmInstructionAssembler(std::string &buf, const AsmInstructi
     }
     else
     {
-        buf.assign(instruction.text);
+        buf = instruction.text;
         util::strip_inplace(buf, quote);
         TextUnformatted(buf);
 
@@ -2924,7 +2928,7 @@ bool ImGuiApp::PrintAsmInstructionAssembler(std::string &buf, const AsmInstructi
         {
             ImGui::SameLine();
 
-            util::assign_format(buf, buf.capacity(), "{:+d} bytes", instruction.jumpLen);
+            buf = fmt::format("{:+d} bytes", instruction.jumpLen);
 
             ImScoped::StyleColor greyText(ImGuiCol_Text, LightGrayColor);
             TextUnformatted(buf);
