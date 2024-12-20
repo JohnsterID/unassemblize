@@ -1530,6 +1530,8 @@ void ImGuiApp::FileManagerInfo(
     ProgramFileDescriptor &fileDescriptor,
     const ProgramFileRevisionDescriptor &revisionDescriptor)
 {
+    ImScoped::ItemWidth itemWidth(ImGui::GetFontSize() * -12);
+
     if (revisionDescriptor.m_executable != nullptr)
     {
         if (m_showFileManagerExeSectionInfo)
@@ -1930,8 +1932,6 @@ void ImGuiApp::OutputManagerBody()
 
 void ImGuiApp::ComparisonManagerBody(ProgramComparisonDescriptor &descriptor)
 {
-    // #TODO: Add clippers to lists and tables.
-
     if (TreeNodeHeader("Files", ImGuiTreeNodeFlags_DefaultOpen))
     {
         {
@@ -2205,11 +2205,14 @@ void ImGuiApp::ComparisonManagerBundlesList(ProgramComparisonDescriptor::File &f
 {
     using File = ProgramComparisonDescriptor::File;
 
+    // Using AlwaysHorizontalScrollbar instead of HorizontalScrollbar because the list is glitching a bit
+    // when the clipper makes it alternate between scroll bar on and off every frame in some situations.
     ImScoped::Child styleChild(
         "##bundles_list_style",
         ImVec2(0, 0),
         ImGuiChildFlags_FrameStyle,
-        ImGuiWindowFlags_HorizontalScrollbar);
+        ImGuiWindowFlags_AlwaysHorizontalScrollbar);
+
     if (styleChild.IsContentVisible)
     {
         const MatchBundleType type = file.get_selected_bundle_type();
@@ -2225,23 +2228,29 @@ void ImGuiApp::ComparisonManagerBundlesList(ProgramComparisonDescriptor::File &f
         };
         selection.ApplyRequests(ms_io);
 
-        for (int n = 0; n < count; n++)
+        ImGuiListClipper clipper;
+        clipper.Begin(count);
+
+        while (clipper.Step())
         {
-            // 1
-            ImGui::SetNextItemSelectionUserData(n);
-            // 2
-            const NamedFunctionBundle &bundle = file.get_filtered_bundle(n);
-            const File::ListItemUiInfo &uiInfo = file.get_filtered_bundle_ui_info(n);
-
-            ScopedStyleColor styleColor;
-
-            if (uiInfo.m_similarity.has_value())
+            for (int n = clipper.DisplayStart; n < clipper.DisplayEnd; ++n)
             {
-                ComparisonManagerItemListStyleColor(styleColor, uiInfo);
-            }
+                // 1
+                ImGui::SetNextItemSelectionUserData(n);
+                // 2
+                const NamedFunctionBundle &bundle = file.get_filtered_bundle(n);
+                const File::ListItemUiInfo &uiInfo = file.get_filtered_bundle_ui_info(n);
 
-            const bool selected = selection.Contains(ImGuiID(bundle.id));
-            selectionChanged |= ImGui::Selectable(uiInfo.m_label.c_str(), selected);
+                ScopedStyleColor styleColor;
+
+                if (uiInfo.m_similarity.has_value())
+                {
+                    ComparisonManagerItemListStyleColor(styleColor, uiInfo);
+                }
+
+                const bool selected = selection.Contains(ImGuiID(bundle.id));
+                selectionChanged |= ImGui::Selectable(uiInfo.m_label.c_str(), selected);
+            }
         }
 
         ms_io = ImGui::EndMultiSelect();
@@ -2353,11 +2362,14 @@ void ImGuiApp::ComparisonManagerFunctionsList(
 {
     using File = ProgramComparisonDescriptor::File;
 
+    // Using AlwaysHorizontalScrollbar instead of HorizontalScrollbar because the list is glitching a bit
+    // when the clipper makes it alternate between scroll bar on and off every frame in some situations.
     ImScoped::Child styleChild(
         "##functions_list_style",
         ImVec2(0, 0),
         ImGuiChildFlags_FrameStyle,
-        ImGuiWindowFlags_HorizontalScrollbar);
+        ImGuiWindowFlags_AlwaysHorizontalScrollbar);
+
     if (styleChild.IsContentVisible)
     {
         assert(file.m_revisionDescriptor != nullptr);
@@ -2374,23 +2386,29 @@ void ImGuiApp::ComparisonManagerFunctionsList(
         };
         selection.ApplyRequests(ms_io);
 
-        for (int n = 0; n < count; n++)
+        ImGuiListClipper clipper;
+        clipper.Begin(count);
+
+        while (clipper.Step())
         {
-            // 1
-            ImGui::SetNextItemSelectionUserData(n);
-            // 2
-            const NamedFunction &namedFunction = file.get_filtered_named_function(n);
-            const File::NamedFunctionUiInfo &uiInfo = file.get_filtered_named_function_ui_info(n);
-
-            ScopedStyleColor styleColor;
-
-            if (uiInfo.m_similarity.has_value())
+            for (int n = clipper.DisplayStart; n < clipper.DisplayEnd; ++n)
             {
-                ComparisonManagerItemListStyleColor(styleColor, uiInfo);
-            }
+                // 1
+                ImGui::SetNextItemSelectionUserData(n);
+                // 2
+                const NamedFunction &namedFunction = file.get_filtered_named_function(n);
+                const File::NamedFunctionUiInfo &uiInfo = file.get_filtered_named_function_ui_info(n);
 
-            const bool selected = selection.Contains(ImGuiID(namedFunction.id));
-            selectionChanged |= ImGui::Selectable(uiInfo.m_label.c_str(), selected);
+                ScopedStyleColor styleColor;
+
+                if (uiInfo.m_similarity.has_value())
+                {
+                    ComparisonManagerItemListStyleColor(styleColor, uiInfo);
+                }
+
+                const bool selected = selection.Contains(ImGuiID(namedFunction.id));
+                selectionChanged |= ImGui::Selectable(uiInfo.m_label.c_str(), selected);
+            }
         }
 
         ms_io = ImGui::EndMultiSelect();
@@ -2403,12 +2421,57 @@ void ImGuiApp::ComparisonManagerFunctionsList(
     }
 }
 
-void ImGuiApp::ComparisonManagerFunctionEntries(const ProgramComparisonDescriptor &descriptor)
+void ImGuiApp::ComparisonManagerFunctionEntries(ProgramComparisonDescriptor &descriptor)
+{
+    ComparisonManagerFunctionEntriesControls(descriptor);
+
+    ImScoped::Child child("##function_entries");
+    if (child.IsContentVisible)
+    {
+        const ProgramComparisonDescriptor::FunctionsPageData pageData = descriptor.get_selected_functions_page_data();
+
+        ComparisonManagerMatchedFunctions(descriptor, pageData.matchedFunctionIndices);
+
+        for (IndexT i = 0; i < 2; ++i)
+        {
+            ComparisonManagerNamedFunctions(descriptor, i, pageData.namedFunctionIndicesArray[i]);
+        }
+    }
+}
+
+void ImGuiApp::ComparisonManagerFunctionEntriesControls(ProgramComparisonDescriptor &descriptor)
+{
+    {
+        ImScoped::ItemWidth itemWidth(100);
+
+        ImGui::DragInt("Page Size", &descriptor.m_imguiPageSize, 0.5f, 1, 100, "%d", ImGuiSliderFlags_AlwaysClamp);
+        ImGui::SameLine();
+        TooltipTextMarker(
+            "Click and drag to edit value.\n"
+            "Hold SHIFT/ALT for faster/slower edit.\n"
+            "Double-click or CTRL+click to input value.");
+    }
+
+    {
+        ImScoped::ItemWidth itemWidth(200);
+
+        const int pageCount = std::max(descriptor.get_functions_page_count(), 1);
+        descriptor.m_imguiSelectedPage = std::min(descriptor.m_imguiSelectedPage, pageCount);
+        ImGui::SameLine();
+        ImGui::SliderInt("Page Select", &descriptor.m_imguiSelectedPage, 1, pageCount, "%d", ImGuiSliderFlags_AlwaysClamp);
+        ImGui::SameLine();
+        TooltipTextMarker("CTRL+click to input value.");
+    }
+}
+
+void ImGuiApp::ComparisonManagerMatchedFunctions(
+    const ProgramComparisonDescriptor &descriptor,
+    span<const IndexT> matchedFunctionIndices)
 {
     using File = ProgramComparisonDescriptor::File;
     const float treeOffsetX = ImGui::GetTreeNodeToLabelSpacing();
 
-    for (IndexT matchedFunctionIndex : descriptor.m_selectedMatchedFunctionIndices)
+    for (IndexT matchedFunctionIndex : matchedFunctionIndices)
     {
         const MatchedFunction &matchedFunction = descriptor.m_matchedFunctions[matchedFunctionIndex];
         if (!matchedFunction.is_compared())
@@ -2424,6 +2487,7 @@ void ImGuiApp::ComparisonManagerFunctionEntries(const ProgramComparisonDescripto
             ComparisonManagerItemListStyleColor(styleColor, uiInfo0, treeOffsetX);
         }
 
+        // #TODO: Check if node can be excluded from imgui ini save because it makes it big and slow.
         ImScoped::TreeNodeEx tree(
             uiInfo0.m_label.c_str(),
             ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth);
@@ -2433,33 +2497,6 @@ void ImGuiApp::ComparisonManagerFunctionEntries(const ProgramComparisonDescripto
         if (tree.IsOpen)
         {
             ComparisonManagerMatchedFunction(descriptor, matchedFunction);
-        }
-    }
-
-    for (IndexT i = 0; i < 2; ++i)
-    {
-        const ProgramComparisonDescriptor::File &file = descriptor.m_files[i];
-        const ProgramFileRevisionDescriptor &revision = *file.m_revisionDescriptor;
-
-        for (IndexT namedFunctionIndex : file.m_selectedNamedFunctionIndices)
-        {
-            if (file.is_matched_function(namedFunctionIndex))
-                continue;
-
-            const NamedFunction &namedFunction = revision.m_namedFunctions[namedFunctionIndex];
-            if (!namedFunction.is_disassembled())
-                continue;
-
-            const File::NamedFunctionUiInfo &uiInfo0 = file.m_namedFunctionUiInfos[namedFunctionIndex];
-
-            ImScoped::TreeNodeEx tree(
-                uiInfo0.m_label.c_str(),
-                ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth);
-
-            if (tree.IsOpen)
-            {
-                ComparisonManagerNamedFunctionEntry(i, revision, namedFunction);
-            }
         }
     }
 }
@@ -2622,7 +2659,36 @@ void ImGuiApp::ComparisonManagerMatchedFunctionContentTable(
     }
 }
 
-void ImGuiApp::ComparisonManagerNamedFunctionEntry(
+void ImGuiApp::ComparisonManagerNamedFunctions(
+    const ProgramComparisonDescriptor &descriptor,
+    IndexT sideIdx,
+    span<const IndexT> namedFunctionIndices)
+{
+    using File = ProgramComparisonDescriptor::File;
+    const File &file = descriptor.m_files[sideIdx];
+
+    for (IndexT namedFunctionIndex : namedFunctionIndices)
+    {
+        const ProgramFileRevisionDescriptor &revision = *file.m_revisionDescriptor;
+        const NamedFunction &namedFunction = revision.m_namedFunctions[namedFunctionIndex];
+        if (!namedFunction.is_disassembled())
+            continue;
+
+        const File::NamedFunctionUiInfo &uiInfo0 = file.m_namedFunctionUiInfos[namedFunctionIndex];
+
+        // #TODO: Check if node can be excluded from imgui ini save because it makes it big and slow.
+        ImScoped::TreeNodeEx tree(
+            uiInfo0.m_label.c_str(),
+            ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth);
+
+        if (tree.IsOpen)
+        {
+            ComparisonManagerNamedFunction(sideIdx, revision, namedFunction);
+        }
+    }
+}
+
+void ImGuiApp::ComparisonManagerNamedFunction(
     IndexT sideIdx,
     const ProgramFileRevisionDescriptor &fileRevision,
     const NamedFunction &namedFunction)
