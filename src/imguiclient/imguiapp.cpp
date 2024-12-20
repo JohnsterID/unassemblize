@@ -1675,7 +1675,7 @@ void ImGuiApp::FileManagerInfoPdbCompilands(const ProgramFileRevisionDescriptor 
             ImGui::TableHeadersRow();
 
             ImGuiListClipper clipper;
-            clipper.Begin(down_cast<int>(compilands.size()));
+            clipper.Begin(compilands.size());
 
             while (clipper.Step())
             {
@@ -1716,7 +1716,7 @@ void ImGuiApp::FileManagerInfoPdbSourceFiles(const ProgramFileRevisionDescriptor
             ImGui::TableHeadersRow();
 
             ImGuiListClipper clipper;
-            clipper.Begin(down_cast<int>(source_files.size()));
+            clipper.Begin(source_files.size());
 
             while (clipper.Step())
             {
