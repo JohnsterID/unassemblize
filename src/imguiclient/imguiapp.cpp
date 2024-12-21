@@ -1366,53 +1366,13 @@ void ImGuiApp::FileManagerDescriptorPdbConfig(ProgramFileDescriptor &descriptor)
     }
 }
 
-bool ImGuiApp::ShowRemoveFileConfirmationPopup(const char *name)
-{
-    bool confirmed = false;
-
-    const ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowSizeConstraints(ImVec2(300.0f, 0.0f), ImVec2(FLT_MAX, FLT_MAX));
-
-    if (ImGui::BeginPopupModal(name, NULL, ImGuiWindowFlags_AlwaysAutoResize))
-    {
-        ImGui::TextWrapped("Are you sure you want to remove this file from the list? It does not delete it from disk.");
-        ImGui::Spacing();
-
-        const float availWidth = ImGui::GetContentRegionAvail().x;
-        const float buttonWidth = ImMin(120.0f, (availWidth - ImGui::GetStyle().ItemSpacing.x) / 2);
-        const ImVec2 buttonSize(buttonWidth, 0.0f);
-
-        // Center the 2 buttons in the dialog.
-        const float buttonsWidth = buttonWidth * 2 + ImGui::GetStyle().ItemSpacing.x;
-        const float indent = (availWidth - buttonsWidth) * 0.5f;
-        if (indent > 0.0f)
-        {
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + indent);
-        }
-
-        if (ImGui::Button("OK", buttonSize))
-        {
-            confirmed = true;
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::SetItemDefaultFocus();
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel", buttonSize))
-        {
-            ImGui::CloseCurrentPopup();
-        }
-
-        ImGui::EndPopup();
-    }
-    return confirmed;
-}
-
 void ImGuiApp::FileManagerDescriptorActions(ProgramFileDescriptor &descriptor, bool &erased)
 {
     // Action buttons
     {
-        constexpr char *popupName = "Remove File?";
+        const char *const popupName = "Remove File?";
+        const char *const popupMessage =
+            "Are you sure you want to remove this file from the list? It will not be deleted from disk.";
         {
             // Change button color.
             ImScoped::StyleColor color1(ImGuiCol_Button, (ImVec4)ImColor::HSV(0.0f, 0.0f, 0.2f));
@@ -1427,7 +1387,7 @@ void ImGuiApp::FileManagerDescriptorActions(ProgramFileDescriptor &descriptor, b
                 ImGui::OpenPopup(popupName);
             }
         }
-        erased = ShowRemoveFileConfirmationPopup(popupName);
+        erased = ShowConfirmationPopup(popupName, popupMessage);
     }
 
     ImGui::SameLine();

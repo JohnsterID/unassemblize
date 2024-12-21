@@ -39,8 +39,6 @@ private:
     int m_popStyleCount = 0;
 };
 
-extern WindowPlacement g_lastFileDialogPlacement;
-
 void TextUnformatted(std::string_view view);
 void TextUnformattedCenteredX(std::string_view view, float width_x = 0.f);
 
@@ -58,8 +56,9 @@ ImU32 CreateColor(ImU32 color, uint8_t alpha);
 
 void DrawInTextCircle(ImU32 color);
 
-void ApplyPlacementToNextWindow(WindowPlacement &placement);
+bool ApplyPlacementToNextWindow(WindowPlacement &placement);
 void FetchPlacementFromWindowByName(WindowPlacement &placement, const char *window_name);
+void FetchPlacementFromCurrentWindow(WindowPlacement &placement);
 
 void AddFileDialogButton(
     std::string *file_path_name,
@@ -67,6 +66,8 @@ void AddFileDialogButton(
     const std::string &key,
     const std::string &title,
     const char *filters);
+
+bool ShowConfirmationPopup(const char *name, const char *message);
 
 // Calculate a default table height.
 template<bool TableUsesHeader = true>
