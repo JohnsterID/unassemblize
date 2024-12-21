@@ -1366,21 +1366,68 @@ void ImGuiApp::FileManagerDescriptorPdbConfig(ProgramFileDescriptor &descriptor)
     }
 }
 
+bool ImGuiApp::ShowRemoveFileConfirmationPopup(const char *name)
+{
+    bool confirmed = false;
+
+    const ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSizeConstraints(ImVec2(300.0f, 0.0f), ImVec2(FLT_MAX, FLT_MAX));
+
+    if (ImGui::BeginPopupModal(name, NULL, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        ImGui::TextWrapped("Are you sure you want to remove this file from the list? It does not delete it from disk.");
+        ImGui::Spacing();
+
+        const float availWidth = ImGui::GetContentRegionAvail().x;
+        const float buttonWidth = ImMin(120.0f, (availWidth - ImGui::GetStyle().ItemSpacing.x) / 2);
+        const ImVec2 buttonSize(buttonWidth, 0.0f);
+
+        // Center the 2 buttons in the dialog.
+        const float buttonsWidth = buttonWidth * 2 + ImGui::GetStyle().ItemSpacing.x;
+        const float indent = (availWidth - buttonsWidth) * 0.5f;
+        if (indent > 0.0f)
+        {
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + indent);
+        }
+
+        if (ImGui::Button("OK", buttonSize))
+        {
+            confirmed = true;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SetItemDefaultFocus();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", buttonSize))
+        {
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+    return confirmed;
+}
+
 void ImGuiApp::FileManagerDescriptorActions(ProgramFileDescriptor &descriptor, bool &erased)
 {
     // Action buttons
     {
-        // Change button color.
-        ImScoped::StyleColor color1(ImGuiCol_Button, (ImVec4)ImColor::HSV(0.0f, 0.0f, 0.2f));
-        ImScoped::StyleColor color2(ImGuiCol_ButtonHovered, (ImVec4)ImColor::HSV(0.0f, 0.0f, 0.3f));
-        ImScoped::StyleColor color3(ImGuiCol_ButtonActive, (ImVec4)ImColor::HSV(0.0f, 0.0f, 0.4f));
-        // Change text color too to make it readable with the light ImGui color theme.
-        ImScoped::StyleColor text_color1(ImGuiCol_Text, ImVec4(1.00f, 1.00f, 1.00f, 1.00f));
-        ImScoped::StyleColor text_color2(ImGuiCol_TextDisabled, ImVec4(0.50f, 0.50f, 0.50f, 1.00f));
-        erased = Button("Remove");
+        constexpr char *popupName = "Remove File?";
+        {
+            // Change button color.
+            ImScoped::StyleColor color1(ImGuiCol_Button, (ImVec4)ImColor::HSV(0.0f, 0.0f, 0.2f));
+            ImScoped::StyleColor color2(ImGuiCol_ButtonHovered, (ImVec4)ImColor::HSV(0.0f, 0.0f, 0.3f));
+            ImScoped::StyleColor color3(ImGuiCol_ButtonActive, (ImVec4)ImColor::HSV(0.0f, 0.0f, 0.4f));
+            // Change text color too to make it readable with the light ImGui color theme.
+            ImScoped::StyleColor text_color1(ImGuiCol_Text, ImVec4(1.00f, 1.00f, 1.00f, 1.00f));
+            ImScoped::StyleColor text_color2(ImGuiCol_TextDisabled, ImVec4(0.50f, 0.50f, 0.50f, 1.00f));
 
-        // #TODO: Guard this button press with a confirmation dialog ?
-        // There is an example for this in "Dear ImGui Demo" > "Popups & Modal windows" > "Modals".
+            if (Button("Remove"))
+            {
+                ImGui::OpenPopup(popupName);
+            }
+        }
+        erased = ShowRemoveFileConfirmationPopup(popupName);
     }
 
     ImGui::SameLine();
@@ -1398,6 +1445,7 @@ void ImGuiApp::FileManagerDescriptorActions(ProgramFileDescriptor &descriptor, b
             load_async(&descriptor);
         }
     }
+
     ImGui::SameLine();
     {
         ImScoped::Disabled disabled(!descriptor.can_save_config());

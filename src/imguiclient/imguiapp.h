@@ -281,6 +281,8 @@ private:
     static bool TreeNodeHeader(const char *str_id, ImGuiTreeNodeFlags flags, const char *fmt, ...) IM_FMTARGS(3);
     static void TreeNodeHeaderStyleColor(ScopedStyleColor &styleColor);
 
+    bool ShowRemoveFileConfirmationPopup(const char *name);
+
 private:
     ImVec2 m_windowPos = ImVec2(0, 0);
     ImVec2 m_windowSize = ImVec2(0, 0);
