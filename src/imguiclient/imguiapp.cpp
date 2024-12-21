@@ -2468,7 +2468,6 @@ void ImGuiApp::ComparisonManagerMatchedFunctions(
     const ProgramComparisonDescriptor &descriptor,
     span<const IndexT> matchedFunctionIndices)
 {
-    using File = ProgramComparisonDescriptor::File;
     const float treeOffsetX = ImGui::GetTreeNodeToLabelSpacing();
 
     for (IndexT matchedFunctionIndex : matchedFunctionIndices)
@@ -2477,19 +2476,20 @@ void ImGuiApp::ComparisonManagerMatchedFunctions(
         if (!matchedFunction.is_compared())
             continue;
 
-        const IndexT namedFunctionIndex0 = matchedFunction.named_idx_pair[0];
-        const File::NamedFunctionUiInfos &uiInfos0 = descriptor.m_files[0].m_namedFunctionUiInfos;
-        const File::NamedFunctionUiInfo &uiInfo0 = uiInfos0[namedFunctionIndex0];
+        const ProgramComparisonDescriptor::File::NamedFunctionUiInfo *uiInfo =
+            descriptor.get_first_valid_named_function_ui_info(matchedFunction);
+
+        assert(uiInfo != nullptr);
 
         ScopedStyleColor styleColor;
-        if (uiInfo0.m_similarity.has_value())
+        if (uiInfo->m_similarity.has_value())
         {
-            ComparisonManagerItemListStyleColor(styleColor, uiInfo0, treeOffsetX);
+            ComparisonManagerItemListStyleColor(styleColor, *uiInfo, treeOffsetX);
         }
 
         // #TODO: Check if node can be excluded from imgui ini save because it makes it big and slow.
         ImScoped::TreeNodeEx tree(
-            uiInfo0.m_label.c_str(),
+            uiInfo->m_label.c_str(),
             ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth);
 
         styleColor.PopAll();

@@ -42,6 +42,8 @@ struct ProgramComparisonDescriptor
                 bool hasMatchedFunction,
                 std::optional<int8_t> similarity = std::nullopt);
 
+            bool is_valid() const { return !m_label.empty(); }
+
             std::string m_label;
             std::optional<int8_t> m_similarity = std::nullopt;
         };
@@ -184,6 +186,8 @@ struct ProgramComparisonDescriptor
     FunctionsSimilarityReport build_function_similarity_report(span<const IndexT> matchedFunctionIndices);
 
     void update_matched_named_function_ui_infos(span<const IndexT> matchedFunctionIndices);
+
+    const File::NamedFunctionUiInfo *get_first_valid_named_function_ui_info(const MatchedFunction &matchedFunction) const;
 
     span<const IndexT> get_matched_named_function_indices_for_processing(IndexT side);
 

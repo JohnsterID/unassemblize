@@ -277,6 +277,7 @@ void ProgramComparisonDescriptor::File::on_bundles_interaction()
 
     update_selected_bundles();
     update_active_functions();
+    // Perhaps the ui infos should be build once earlier and not on every bundle interaction?
     update_named_function_ui_infos(get_active_named_function_indices());
 }
 
@@ -677,6 +678,20 @@ void ProgramComparisonDescriptor::update_matched_named_function_ui_infos(span<co
             uiInfo.update_info(namedFunction.name, namedFunction.id, true, similarity);
         }
     }
+}
+
+const ProgramComparisonDescriptor::File::NamedFunctionUiInfo *ProgramComparisonDescriptor::
+    get_first_valid_named_function_ui_info(const MatchedFunction &matchedFunction) const
+{
+    for (IndexT i = 0; i < 2; ++i)
+    {
+        const IndexT namedFunctionIndex = matchedFunction.named_idx_pair[i];
+        const File::NamedFunctionUiInfos &uiInfos = m_files[i].m_namedFunctionUiInfos;
+        const File::NamedFunctionUiInfo &uiInfo = uiInfos[namedFunctionIndex];
+        if (uiInfo.is_valid())
+            return &uiInfo;
+    }
+    return nullptr;
 }
 
 span<const IndexT> ProgramComparisonDescriptor::get_matched_named_function_indices_for_processing(IndexT side)
