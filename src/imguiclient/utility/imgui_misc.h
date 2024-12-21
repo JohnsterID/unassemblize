@@ -60,14 +60,14 @@ bool ApplyPlacementToNextWindow(WindowPlacement &placement);
 void FetchPlacementFromWindowByName(WindowPlacement &placement, const char *window_name);
 void FetchPlacementFromCurrentWindow(WindowPlacement &placement);
 
-void AddFileDialogButton(
+void UpdateFileDialog(
+    bool open,
     std::string *file_path_name,
-    std::string_view button_label,
     const std::string &key,
     const std::string &title,
     const char *filters);
 
-bool ShowConfirmationPopup(const char *name, const char *message);
+bool UpdateConfirmationPopup(bool open, const char *name, const char *message);
 
 // Calculate a default table height.
 template<bool TableUsesHeader = true>

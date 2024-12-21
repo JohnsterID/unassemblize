@@ -1176,8 +1176,8 @@ void ImGuiApp::ComparisonManagerWindows()
 
 namespace
 {
-const std::string_view g_browse_file_button_label = "Browse ..";
-const std::string g_select_file_dialog_title = "Select File";
+static const char *const g_browse_file_button_label = "Browse ..";
+static const std::string g_select_file_dialog_title = "Select File";
 } // namespace
 
 void ImGuiApp::FileManagerBody()
@@ -1280,9 +1280,9 @@ void ImGuiApp::FileManagerDescriptor(ProgramFileDescriptor &descriptor, bool &er
 
 void ImGuiApp::FileManagerDescriptorExeFile(ProgramFileDescriptor &descriptor)
 {
-    AddFileDialogButton(
-        &descriptor.m_exeFilename,
+    FileDialogButton(
         g_browse_file_button_label,
+        &descriptor.m_exeFilename,
         fmt::format("exe_file_dialog{:d}", descriptor.m_id),
         g_select_file_dialog_title,
         "Program (*.*){((.*))}"); // ((.*)) is regex for all files
@@ -1307,9 +1307,9 @@ void ImGuiApp::FileManagerDescriptorExeFile(ProgramFileDescriptor &descriptor)
 
 void ImGuiApp::FileManagerDescriptorExeConfig(ProgramFileDescriptor &descriptor)
 {
-    AddFileDialogButton(
-        &descriptor.m_exeConfigFilename,
+    FileDialogButton(
         g_browse_file_button_label,
+        &descriptor.m_exeConfigFilename,
         fmt::format("exe_config_file_dialog{:d}", descriptor.m_id),
         g_select_file_dialog_title,
         "Config (*.json){.json}");
@@ -1335,9 +1335,9 @@ void ImGuiApp::FileManagerDescriptorExeConfig(ProgramFileDescriptor &descriptor)
 
 void ImGuiApp::FileManagerDescriptorPdbFile(ProgramFileDescriptor &descriptor)
 {
-    AddFileDialogButton(
-        &descriptor.m_pdbFilename,
+    FileDialogButton(
         g_browse_file_button_label,
+        &descriptor.m_pdbFilename,
         fmt::format("pdb_file_dialog{:d}", descriptor.m_id),
         g_select_file_dialog_title,
         "Program Database (*.pdb){.pdb}");
@@ -1348,9 +1348,9 @@ void ImGuiApp::FileManagerDescriptorPdbFile(ProgramFileDescriptor &descriptor)
 
 void ImGuiApp::FileManagerDescriptorPdbConfig(ProgramFileDescriptor &descriptor)
 {
-    AddFileDialogButton(
-        &descriptor.m_pdbConfigFilename,
+    FileDialogButton(
         g_browse_file_button_label,
+        &descriptor.m_pdbConfigFilename,
         fmt::format("pdb_config_file_dialog{:d}", descriptor.m_id),
         g_select_file_dialog_title,
         "Config (*.json){.json}");
@@ -1370,9 +1370,7 @@ void ImGuiApp::FileManagerDescriptorActions(ProgramFileDescriptor &descriptor, b
 {
     // Action buttons
     {
-        const char *const popupName = "Remove File?";
-        const char *const popupMessage =
-            "Are you sure you want to remove this file from the list? It will not be deleted from disk.";
+        bool open;
         {
             // Change button color.
             ImScoped::StyleColor color1(ImGuiCol_Button, (ImVec4)ImColor::HSV(0.0f, 0.0f, 0.2f));
@@ -1382,12 +1380,14 @@ void ImGuiApp::FileManagerDescriptorActions(ProgramFileDescriptor &descriptor, b
             ImScoped::StyleColor text_color1(ImGuiCol_Text, ImVec4(1.00f, 1.00f, 1.00f, 1.00f));
             ImScoped::StyleColor text_color2(ImGuiCol_TextDisabled, ImVec4(0.50f, 0.50f, 0.50f, 1.00f));
 
-            if (Button("Remove"))
-            {
-                ImGui::OpenPopup(popupName);
-            }
+            open = Button("Remove");
         }
-        erased = ShowConfirmationPopup(popupName, popupMessage);
+        const std::string descriptorName = descriptor.create_descriptor_name();
+        const std::string dialogTitle = fmt::format("Remove {:s}?", descriptorName);
+        erased = UpdateConfirmationPopup(
+            open,
+            dialogTitle.c_str(),
+            "Are you sure you want to remove this file from the list? It will not be deleted from disk.");
     }
 
     ImGui::SameLine();
@@ -3169,6 +3169,19 @@ bool ImGuiApp::Button(const char *label, ImGuiButtonFlags flags)
         size = StandardMinButtonSize;
     }
     return ImGui::ButtonEx(label, size, flags);
+}
+
+bool ImGuiApp::FileDialogButton(
+    const char *button_label,
+    std::string *file_path_name,
+    const std::string &key,
+    const std::string &title,
+    const char *filters)
+{
+    const std::string button_label_key = fmt::format("{:s}##{:s}", button_label, key);
+    const bool open = ImGui::Button(button_label_key.c_str());
+    UpdateFileDialog(open, file_path_name, key, title, filters);
+    return open;
 }
 
 bool ImGuiApp::TreeNodeHeader(const char *label, ImGuiTreeNodeFlags flags)

@@ -215,9 +215,9 @@ void FetchPlacementFromCurrentWindow(WindowPlacement &placement)
     placement.size = ImGui::GetWindowSize();
 }
 
-void AddFileDialogButton(
+void UpdateFileDialog(
+    bool open,
     std::string *file_path_name,
-    std::string_view button_label,
     const std::string &key,
     const std::string &title,
     const char *filters)
@@ -225,8 +225,7 @@ void AddFileDialogButton(
     constexpr ImVec2 minSize(600.f, 300.f);
     IGFD::FileDialog *instance = ImGuiFileDialog::Instance();
 
-    const std::string button_label_key = fmt::format("{:s}##{:s}", button_label, key);
-    if (ImGui::Button(button_label_key.c_str()))
+    if (open)
     {
         // Restore position and size of any last file dialog.
         if (!ApplyPlacementToNextWindow(g_lastFileDialogPlacement))
@@ -246,7 +245,7 @@ void AddFileDialogButton(
     if (instance->Display(key, ImGuiWindowFlags_NoCollapse, minSize))
     {
         // Note: Is using internals of ImGuiFileDialog
-        const std::string window_name = title + "##" + key;
+        const std::string window_name = fmt::format("{:s}##{:s}", title, key);
         FetchPlacementFromWindowByName(g_lastFileDialogPlacement, window_name.c_str());
 
         if (instance->IsOk())
@@ -257,18 +256,22 @@ void AddFileDialogButton(
     }
 }
 
-bool ShowConfirmationPopup(const char *name, const char *message)
+bool UpdateConfirmationPopup(bool open, const char *name, const char *message)
 {
     bool confirmed = false;
 
-    ImGui::SetNextWindowSizeConstraints(ImVec2(300.0f, 0.0f), ImVec2(FLT_MAX, FLT_MAX));
-
-    // Restore position and size of any last confirmation dialog.
-    if (!ApplyPlacementToNextWindow(g_lastConfirmationDialogPlacement))
+    if (open)
     {
-        // If it is the first opened dialog, then center it.
-        const ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-        ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        ImGui::OpenPopup(name);
+        ImGui::SetNextWindowSizeConstraints(ImVec2(300.0f, 0.0f), ImVec2(FLT_MAX, FLT_MAX));
+
+        // Restore position and size of any last confirmation dialog.
+        if (!ApplyPlacementToNextWindow(g_lastConfirmationDialogPlacement))
+        {
+            // If it is the first opened dialog, then center it.
+            const ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+            ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        }
     }
 
     if (ImGui::BeginPopupModal(name, NULL, ImGuiWindowFlags_AlwaysAutoResize))

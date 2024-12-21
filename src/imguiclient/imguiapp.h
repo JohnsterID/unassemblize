@@ -277,6 +277,12 @@ private:
         float offsetX = 0.0f);
 
     static bool Button(const char *label, ImGuiButtonFlags flags = 0);
+    static bool FileDialogButton(
+        const char *button_label,
+        std::string *file_path_name,
+        const std::string &key,
+        const std::string &title,
+        const char *filters);
     static bool TreeNodeHeader(const char *label, ImGuiTreeNodeFlags flags = 0);
     static bool TreeNodeHeader(const char *str_id, ImGuiTreeNodeFlags flags, const char *fmt, ...) IM_FMTARGS(3);
     static void TreeNodeHeaderStyleColor(ScopedStyleColor &styleColor);
