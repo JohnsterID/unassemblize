@@ -76,6 +76,9 @@ struct ProgramComparisonDescriptor
         bool named_functions_built() const;
         bool bundles_ready() const; // Bundles can be used when this returns true.
 
+        span<const IndexT> get_matched_function_indices() const; // Links to MatchedFunctions.
+        span<const IndexT> get_unmatched_named_function_indices() const; // Links to NamedFunctions.
+
         bool is_matched_function(IndexT namedFunctionIndex) const;
 
         MatchBundleType get_selected_bundle_type() const;
@@ -101,27 +104,31 @@ struct ProgramComparisonDescriptor
 
         void update_selected_named_functions();
 
-        // Selected file index in list box. Is not reset on rebuild.
+        WorkState m_asyncWorkState;
+
+        // UI OPTIONS. IS NOT RESET ON REBUILD.
+
+        // Selected file index in list box.
         // Does not necessarily link to current loaded file.
         IndexT m_imguiSelectedFileIdx = 0;
 
-        // Selected bundle type in combo box. Is not reset on rebuild.
+        // Selected bundle type in combo box.
         IndexT m_imguiSelectedBundleTypeIdx = 0;
 
-        // Functions list options. Is not reset on rebuild.
+        // Functions list options.
         bool m_imguiShowMatchedFunctions = true;
         bool m_imguiShowUnmatchedFunctions = true;
 
-        // Selected bundles in multi select box. Is not reset on rebuild.
+        // Selected bundles in multi select box.
         ImGuiBundlesSelectionArray m_imguiBundlesSelectionArray;
 
-        // Selected functions in multi select box. Is not reset on rebuild.
+        // Selected functions in multi select box.
         ImGuiSelectionBasicStorage m_imguiFunctionsSelection;
+
+        // BUILT CONTENTS. IS RESET ON REBUILD.
 
         TextFilterDescriptor<const NamedFunctionBundle *> m_bundlesFilter = "bundles_filter";
         TextFilterDescriptor<IndexT> m_functionIndicesFilter = "functions_filter";
-
-        WorkState m_asyncWorkState;
 
         ProgramFileRevisionDescriptorPtr m_revisionDescriptor;
 
@@ -176,6 +183,8 @@ struct ProgramComparisonDescriptor
     bool matched_functions_built() const;
     bool bundles_ready() const;
 
+    span<const IndexT> get_matched_function_indices() const; // Links to MatchedFunctions.
+
     bool matched_functions_disassembled(span<const IndexT> matchedFunctionIndices) const;
 
     // Requires prior call(s) to File::update_selected_functions()
@@ -189,7 +198,9 @@ struct ProgramComparisonDescriptor
 
     const File::NamedFunctionUiInfo *get_first_valid_named_function_ui_info(const MatchedFunction &matchedFunction) const;
 
-    span<const IndexT> get_matched_named_function_indices_for_processing(IndexT side);
+    span<const IndexT> get_matched_named_function_indices_for_processing(
+        span<const IndexT> matchedFunctionIndices,
+        IndexT side);
 
     int get_functions_page_count() const;
     FunctionsPageData get_selected_functions_page_data() const;
@@ -198,11 +209,18 @@ struct ProgramComparisonDescriptor
 
     int m_pendingBuildComparisonRecordsCommands = 0;
 
+    // UI OPTIONS. IS NOT RESET ON REBUILD.
+
     // Selected functions in pages.
     int m_imguiPageSize = 25;
     int m_imguiSelectedPage = 1; // 1..n
 
+    bool m_imguiProcessMatchedFunctionsImmediately = false;
+    bool m_imguiProcessUnmatchedFunctionsImmediately = false;
     bool m_imguiHasOpenWindow = true;
+
+    // BUILT CONTENTS. IS RESET ON REBUILD.
+
     bool m_matchedFunctionsBuilt = false;
 
     MatchedFunctions m_matchedFunctions;

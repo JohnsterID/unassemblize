@@ -92,6 +92,7 @@ void ProgramComparisonDescriptor::File::prepare_rebuild()
     util::free_container(m_selectedBundles);
     util::free_container(m_activeNamedFunctionIndices);
     util::free_container(m_selectedNamedFunctionIndices);
+    util::free_container(m_selectedUnmatchedNamedFunctionIndices);
 }
 
 void ProgramComparisonDescriptor::File::init()
@@ -170,6 +171,18 @@ bool ProgramComparisonDescriptor::File::named_functions_built() const
 bool ProgramComparisonDescriptor::File::bundles_ready() const
 {
     return m_compilandBundlesBuilt != TriState::False && m_sourceFileBundlesBuilt != TriState::False && m_singleBundleBuilt;
+}
+
+span<const IndexT> ProgramComparisonDescriptor::File::get_matched_function_indices() const
+{
+    assert(m_singleBundle.flags & BuildMatchedFunctionIndices);
+    return {m_singleBundle.matchedFunctionIndices};
+}
+
+span<const IndexT> ProgramComparisonDescriptor::File::get_unmatched_named_function_indices() const
+{
+    assert(m_singleBundle.flags & BuildUnmatchedNamedFunctionIndices);
+    return {m_singleBundle.unmatchedNamedFunctionIndices};
 }
 
 bool ProgramComparisonDescriptor::File::is_matched_function(IndexT namedFunctionIndex) const
@@ -516,7 +529,7 @@ bool ProgramComparisonDescriptor::matched_functions_built() const
 
 bool ProgramComparisonDescriptor::bundles_ready() const
 {
-    int count = 0;
+    IndexT count = 0;
 
     for (const File &file : m_files)
     {
@@ -524,6 +537,12 @@ bool ProgramComparisonDescriptor::bundles_ready() const
             ++count;
     }
     return count == m_files.size();
+}
+
+span<const IndexT> ProgramComparisonDescriptor::get_matched_function_indices() const
+{
+    assert(m_files[0].get_matched_function_indices().size() == m_files[1].get_matched_function_indices().size());
+    return m_files[0].get_matched_function_indices();
 }
 
 bool ProgramComparisonDescriptor::matched_functions_disassembled(span<const IndexT> matchedFunctionIndices) const
@@ -694,10 +713,12 @@ const ProgramComparisonDescriptor::File::NamedFunctionUiInfo *ProgramComparisonD
     return nullptr;
 }
 
-span<const IndexT> ProgramComparisonDescriptor::get_matched_named_function_indices_for_processing(IndexT side)
+span<const IndexT> ProgramComparisonDescriptor::get_matched_named_function_indices_for_processing(
+    span<const IndexT> matchedFunctionIndices,
+    IndexT side)
 {
     const std::vector<IndexT> matchedNamedFunctionIndices =
-        build_named_function_indices(m_matchedFunctions, m_selectedMatchedFunctionIndices, side);
+        build_named_function_indices(m_matchedFunctions, matchedFunctionIndices, side);
 
     return m_files[side].m_revisionDescriptor->m_processedNamedFunctions.get_items_for_processing(
         span<const IndexT>{matchedNamedFunctionIndices});

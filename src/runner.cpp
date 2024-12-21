@@ -435,7 +435,7 @@ NamedFunctionBundles Runner::build_bundles(
     const PdbReader *bundling_pdb_reader,
     MatchBundleType bundle_type,
     size_t bundle_file_idx,
-    uint8_t flags)
+    BuildBundleFlags flags)
 {
     NamedFunctionBundles bundles;
 
@@ -466,7 +466,7 @@ NamedFunctionBundles Runner::build_bundles_from_compilands(
     const NamedFunctions &named_functions,
     const NamedFunctionMatchInfos &named_functions_match_infos,
     const PdbReader &pdb_reader,
-    uint8_t flags)
+    BuildBundleFlags flags)
 {
     const PdbCompilandInfoVector &compilands = pdb_reader.get_compilands();
     const PdbFunctionInfoVector &functions = pdb_reader.get_functions();
@@ -478,7 +478,7 @@ NamedFunctionBundles Runner::build_bundles_from_source_files(
     const NamedFunctions &named_functions,
     const NamedFunctionMatchInfos &named_functions_match_infos,
     const PdbReader &pdb_reader,
-    uint8_t flags)
+    BuildBundleFlags flags)
 {
     const PdbSourceFileInfoVector &sources = pdb_reader.get_source_files();
     const PdbFunctionInfoVector &functions = pdb_reader.get_functions();
@@ -490,13 +490,14 @@ NamedFunctionBundle Runner::build_single_bundle(
     const NamedFunctionMatchInfos &named_functions_match_infos,
     const MatchedFunctions &matched_functions,
     size_t bundle_file_idx,
-    uint8_t flags)
+    BuildBundleFlags flags)
 {
     assert(bundle_file_idx < 2);
 
     NamedFunctionBundle bundle;
     bundle.id = 0;
     bundle.name = "all";
+    bundle.flags = flags;
 
     if (flags & BuildMatchedFunctionIndices)
     {
@@ -542,7 +543,7 @@ NamedFunctionBundles Runner::build_bundles(
     const PdbFunctionInfoVector &functions,
     const NamedFunctions &named_functions,
     const NamedFunctionMatchInfos &named_functions_match_infos,
-    uint8_t flags)
+    BuildBundleFlags flags)
 {
     const Address64ToIndexMapT named_function_to_index_map = build_function_address_to_index_map(named_functions);
     const IndexT sources_count = sources.size();
@@ -565,13 +566,14 @@ NamedFunctionBundle Runner::build_bundle(
     const PdbFunctionInfoVector &functions,
     const NamedFunctionMatchInfos &named_functions_match_infos,
     const Address64ToIndexMapT &named_function_to_index_map,
-    uint8_t flags)
+    BuildBundleFlags flags)
 {
     const typename SourceInfoVectorT::value_type &source = sources[source_idx];
     const IndexT function_count = source.functionIds.size();
     NamedFunctionBundle bundle;
     bundle.id = source_idx;
     bundle.name = source.name;
+    bundle.flags = flags;
 
     constexpr uint8_t buildIndicesFlags = BuildMatchedFunctionIndices | BuildMatchedNamedFunctionIndices
         | BuildUnmatchedNamedFunctionIndices | BuildAllNamedFunctionIndices;

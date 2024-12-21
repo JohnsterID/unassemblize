@@ -146,6 +146,17 @@ struct MatchedFunctionsData
     std::array<NamedFunctionMatchInfos, 2> namedFunctionMatchInfosArray;
 };
 
+using BuildBundleFlags = uint8_t;
+enum BuildBundleFlags_ : BuildBundleFlags
+{
+    BuildMatchedFunctionIndices = 1 << 0,
+    BuildMatchedNamedFunctionIndices = 1 << 1,
+    BuildUnmatchedNamedFunctionIndices = 1 << 2,
+    BuildAllNamedFunctionIndices = 1 << 3,
+
+    BuildBundleFlagsAll = 255u,
+};
+
 /*
  * Groups function matches of the same compiland or source file together.
  */
@@ -162,6 +173,8 @@ struct NamedFunctionBundle
     std::vector<IndexT> allNamedFunctionIndices; // Links to NamedFunctions. Contains matched and unmatched ones.
 
     Id id = InvalidId;
+
+    BuildBundleFlags flags = 0;
 };
 using NamedFunctionBundles = std::vector<NamedFunctionBundle>;
 

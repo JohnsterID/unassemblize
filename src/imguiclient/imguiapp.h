@@ -68,7 +68,8 @@ class ImGuiApp
         ImGuiTreeNodeFlags_SpanAvailWidth;
     // clang-format on
 
-    static constexpr uint8_t GuiBuildBundleFlags = BuildMatchedFunctionIndices | BuildAllNamedFunctionIndices;
+    static constexpr BuildBundleFlags GuiBuildBundleFlags = BuildMatchedFunctionIndices | BuildAllNamedFunctionIndices;
+    static constexpr BuildBundleFlags GuiBuildSingleBundleFlags = GuiBuildBundleFlags | BuildUnmatchedNamedFunctionIndices;
     static constexpr ImU32 RedColor = IM_COL32(255, 0, 0, 255);
     static constexpr ImU32 GreenColor = IM_COL32(0, 255, 0, 255);
     static constexpr ImU32 LightGrayColor = IM_COL32(0xA0, 0xA0, 0xA0, 0xFF);
@@ -96,6 +97,8 @@ public:
 
 private:
     void update_app();
+
+    // Begin Command Functions
 
     static WorkQueueCommandPtr create_load_command(ProgramFileRevisionDescriptorPtr &revisionDescriptor);
     static WorkQueueCommandPtr create_load_exe_command(ProgramFileRevisionDescriptorPtr &revisionDescriptor);
@@ -133,7 +136,9 @@ private:
         ProgramComparisonDescriptor *comparisonDescriptor,
         span<const IndexT> matchedFunctionIndices);
 
-    ProgramFileDescriptor *get_program_file_descriptor(size_t program_file_idx);
+    // End Command Functions
+
+    // Begin Asynchronous Functions
 
     void load_async(ProgramFileDescriptor *descriptor);
 
@@ -150,18 +155,29 @@ private:
     void process_named_functions_async(
         ProgramFileRevisionDescriptorPtr &revisionDescriptor,
         span<const IndexT> namedFunctionIndices);
-
     void process_matched_functions_async(
         ProgramComparisonDescriptor *comparisonDescriptor,
         span<const IndexT> matchedFunctionIndices);
-
     void process_named_and_matched_functions_async(
         ProgramComparisonDescriptor *comparisonDescriptor,
         span<const IndexT> matchedFunctionIndices);
 
+    void process_leftover_named_and_matched_functions_async(
+        ProgramComparisonDescriptor &descriptor,
+        span<const IndexT> matchedFunctionIndices);
+    void process_leftover_named_functions_async(
+        ProgramFileRevisionDescriptorPtr &descriptor,
+        span<const IndexT> namedFunctionIndices);
+
+    void process_all_leftover_named_and_matched_functions_async(ProgramComparisonDescriptor &descriptor);
+    void process_all_leftover_named_functions_async(ProgramComparisonDescriptor &descriptor);
+
+    // End Asynchronous Functions.
+
     void add_file();
-    void remove_file(size_t idx);
+    void remove_file(size_t index);
     void remove_all_files();
+    ProgramFileDescriptor *get_program_file_descriptor(size_t index);
 
     void add_program_comparison();
     void update_closed_program_comparisons();
@@ -211,6 +227,8 @@ private:
     void ComparisonManagerFilesLists(ProgramComparisonDescriptor &descriptor);
     void ComparisonManagerFilesList(ProgramComparisonDescriptor::File &file);
     void ComparisonManagerFilesActions(ProgramComparisonDescriptor &descriptor);
+    void ComparisonManagerFilesCompareButton(ProgramComparisonDescriptor &descriptor);
+    void ComparisonManagerFilesProcessFunctionsCheckbox(ProgramComparisonDescriptor &descriptor);
     void ComparisonManagerFilesProgressOverlay(const ProgramComparisonDescriptor &descriptor, const ImRect &rect);
     void ComparisonManagerFilesStatus(const ProgramComparisonDescriptor &descriptor);
     void ComparisonManagerBundlesSettings(ProgramComparisonDescriptor &descriptor);

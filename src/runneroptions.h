@@ -137,16 +137,6 @@ struct BuildUnmatchedFunctionsOptions
     const MatchedFunctions &matched_functions;
 };
 
-enum BuildBundleFlags : uint8_t
-{
-    BuildMatchedFunctionIndices = 1 << 0,
-    BuildMatchedNamedFunctionIndices = 1 << 1,
-    BuildUnmatchedNamedFunctionIndices = 1 << 2,
-    BuildAllNamedFunctionIndices = 1 << 3,
-
-    BuildBundleFlagsAll = 255u,
-};
-
 struct BuildBundlesFromCompilandsOptions
 {
     BuildBundlesFromCompilandsOptions(
@@ -160,7 +150,7 @@ struct BuildBundlesFromCompilandsOptions
     const NamedFunctions &named_functions;
     const NamedFunctionMatchInfos &named_functions_match_infos;
     const PdbReader &pdb_reader;
-    uint8_t flags = BuildBundleFlagsAll;
+    BuildBundleFlags flags = BuildBundleFlagsAll;
 };
 
 struct BuildBundlesFromSourceFilesOptions
@@ -176,7 +166,7 @@ struct BuildBundlesFromSourceFilesOptions
     const NamedFunctions &named_functions;
     const NamedFunctionMatchInfos &named_functions_match_infos;
     const PdbReader &pdb_reader;
-    uint8_t flags = BuildBundleFlagsAll;
+    BuildBundleFlags flags = BuildBundleFlagsAll;
 };
 
 struct BuildSingleBundleOptions
@@ -194,7 +184,7 @@ struct BuildSingleBundleOptions
     const NamedFunctionMatchInfos &named_functions_match_infos;
     const MatchedFunctions &matched_functions;
     const size_t bundle_file_idx;
-    uint8_t flags = BuildBundleFlagsAll;
+    BuildBundleFlags flags = BuildBundleFlagsAll;
 };
 
 struct DisassembleMatchedFunctionsOptions

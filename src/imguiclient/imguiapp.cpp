@@ -468,7 +468,7 @@ WorkQueueCommandPtr ImGuiApp::create_build_single_bundle_command(
         comparisonDescriptor->m_matchedFunctions,
         bundle_file_idx));
 
-    command->options.flags = GuiBuildBundleFlags;
+    command->options.flags = GuiBuildSingleBundleFlags;
 
     command->callback = [file](WorkQueueResultPtr &result) {
         auto res = static_cast<AsyncBuildSingleBundleResult *>(result.get());
@@ -618,15 +618,6 @@ WorkQueueCommandPtr ImGuiApp::create_build_comparison_records_for_selected_funct
     return command;
 }
 
-ProgramFileDescriptor *ImGuiApp::get_program_file_descriptor(size_t program_file_idx)
-{
-    if (program_file_idx < m_programFiles.size())
-    {
-        return m_programFiles[program_file_idx].get();
-    }
-    return nullptr;
-}
-
 void ImGuiApp::load_async(ProgramFileDescriptor *descriptor)
 {
     assert(descriptor != nullptr);
@@ -673,8 +664,11 @@ void ImGuiApp::load_and_init_comparison_async(
     ProgramFileDescriptorPair fileDescriptorPair,
     ProgramComparisonDescriptor *comparisonDescriptor)
 {
+    assert(fileDescriptorPair[0] != nullptr);
+    assert(fileDescriptorPair[1] != nullptr);
     assert(fileDescriptorPair[0]->can_load() || fileDescriptorPair[0]->exe_loaded());
     assert(fileDescriptorPair[1]->can_load() || fileDescriptorPair[1]->exe_loaded());
+    assert(comparisonDescriptor != nullptr);
     assert(!comparisonDescriptor->has_async_work());
 
     for (int i = 0; i < 2; ++i)
@@ -775,6 +769,18 @@ void ImGuiApp::init_comparison_async(ProgramComparisonDescriptor *comparisonDesc
         assert(comparisonDescriptor->bundles_ready());
 
         comparisonDescriptor->init();
+
+        // Queue the next optional commands.
+
+        if (comparisonDescriptor->m_imguiProcessMatchedFunctionsImmediately)
+        {
+            process_all_leftover_named_and_matched_functions_async(*comparisonDescriptor);
+        }
+
+        if (comparisonDescriptor->m_imguiProcessUnmatchedFunctionsImmediately)
+        {
+            process_all_leftover_named_functions_async(*comparisonDescriptor);
+        }
     }
 }
 
@@ -908,32 +914,33 @@ void ImGuiApp::process_named_and_matched_functions_async(
     assert(comparisonDescriptor != nullptr);
     assert(!matchedFunctionIndices.empty());
 
-    std::array<span<const IndexT>, 2> analyzeNamedFunctionIndicesArray;
-    analyzeNamedFunctionIndicesArray[0] = comparisonDescriptor->get_matched_named_function_indices_for_processing(0);
-    analyzeNamedFunctionIndicesArray[1] = comparisonDescriptor->get_matched_named_function_indices_for_processing(1);
+    std::array<span<const IndexT>, 2> namedFunctionIndicesArray;
+    namedFunctionIndicesArray[0] =
+        comparisonDescriptor->get_matched_named_function_indices_for_processing(matchedFunctionIndices, 0);
+    namedFunctionIndicesArray[1] =
+        comparisonDescriptor->get_matched_named_function_indices_for_processing(matchedFunctionIndices, 1);
 
-    int analyzeNamedFunctionsCount = 0;
+    int namedFunctionsCount = 0;
     for (IndexT i = 0; i < 2; ++i)
-        if (!analyzeNamedFunctionIndicesArray[i].empty())
-            ++analyzeNamedFunctionsCount;
+        if (!namedFunctionIndicesArray[i].empty())
+            ++namedFunctionsCount;
 
-    if (analyzeNamedFunctionsCount > 0)
+    if (namedFunctionsCount > 0)
     {
         // Process named functions first.
 
         // Increment here because the command is delayed and therefore the pending work would be unknown at this time.
         ++comparisonDescriptor->m_pendingBuildComparisonRecordsCommands;
 
-        auto sharedWorkCount = std::make_shared<int>(analyzeNamedFunctionsCount);
+        auto sharedWorkCount = std::make_shared<int>(namedFunctionsCount);
 
         for (IndexT i = 0; i < 2; ++i)
         {
-            if (!analyzeNamedFunctionIndicesArray[i].empty())
+            if (!namedFunctionIndicesArray[i].empty())
             {
                 ProgramFileRevisionDescriptorPtr &revisionDescriptor = comparisonDescriptor->m_files[i].m_revisionDescriptor;
 
-                auto command =
-                    create_process_selected_functions_command(revisionDescriptor, analyzeNamedFunctionIndicesArray[i]);
+                auto command = create_process_selected_functions_command(revisionDescriptor, namedFunctionIndicesArray[i]);
 
                 command->chain_to_last(
                     [this, sharedWorkCount, comparisonDescriptor, matchedFunctionIndices](
@@ -964,22 +971,71 @@ void ImGuiApp::process_named_and_matched_functions_async(
     }
 }
 
+void ImGuiApp::process_leftover_named_and_matched_functions_async(
+    ProgramComparisonDescriptor &descriptor,
+    span<const IndexT> matchedFunctionIndices)
+{
+    const span<const IndexT> leftoverMatchedFunctionIndices =
+        descriptor.m_processedMatchedFunctions.get_items_for_processing(matchedFunctionIndices);
+
+    if (!leftoverMatchedFunctionIndices.empty())
+    {
+        process_named_and_matched_functions_async(&descriptor, leftoverMatchedFunctionIndices);
+    }
+}
+
+void ImGuiApp::process_leftover_named_functions_async(
+    ProgramFileRevisionDescriptorPtr &descriptor,
+    span<const IndexT> namedFunctionIndices)
+{
+    const span<const IndexT> leftoverNamedFunctionIndices =
+        descriptor->m_processedNamedFunctions.get_items_for_processing(namedFunctionIndices);
+
+    if (!leftoverNamedFunctionIndices.empty())
+    {
+        process_named_functions_async(descriptor, leftoverNamedFunctionIndices);
+    }
+}
+
+void ImGuiApp::process_all_leftover_named_and_matched_functions_async(ProgramComparisonDescriptor &descriptor)
+{
+    process_leftover_named_and_matched_functions_async(descriptor, descriptor.get_matched_function_indices());
+}
+
+void ImGuiApp::process_all_leftover_named_functions_async(ProgramComparisonDescriptor &descriptor)
+{
+    for (IndexT i = 0; i < 2; ++i)
+    {
+        ProgramComparisonDescriptor::File &file = descriptor.m_files[i];
+        process_leftover_named_functions_async(file.m_revisionDescriptor, file.get_unmatched_named_function_indices());
+    }
+}
+
 void ImGuiApp::add_file()
 {
     m_programFiles.emplace_back(std::make_unique<ProgramFileDescriptor>());
 }
 
-void ImGuiApp::remove_file(size_t idx)
+void ImGuiApp::remove_file(size_t index)
 {
-    if (idx < m_programFiles.size())
+    if (index < m_programFiles.size())
     {
-        m_programFiles.erase(m_programFiles.begin() + idx);
+        m_programFiles.erase(m_programFiles.begin() + index);
     }
 }
 
 void ImGuiApp::remove_all_files()
 {
     m_programFiles.clear();
+}
+
+ProgramFileDescriptor *ImGuiApp::get_program_file_descriptor(size_t index)
+{
+    if (index < m_programFiles.size())
+    {
+        return m_programFiles[index].get();
+    }
+    return nullptr;
 }
 
 void ImGuiApp::add_program_comparison()
@@ -1003,28 +1059,8 @@ void ImGuiApp::on_functions_interaction(ProgramComparisonDescriptor &descriptor,
     file.update_selected_named_functions();
     descriptor.update_selected_matched_functions();
 
-    // Process matched functions, including named functions from both executables.
-    {
-        const span<const IndexT> matchedFunctionIndices = descriptor.m_processedMatchedFunctions.get_items_for_processing(
-            span<const IndexT>{descriptor.m_selectedMatchedFunctionIndices});
-
-        if (!matchedFunctionIndices.empty())
-        {
-            process_named_and_matched_functions_async(&descriptor, matchedFunctionIndices);
-        }
-    }
-
-    // Process remaining named functions. These are unmatched functions that were not already processed before.
-    {
-        const span<const IndexT> namedFunctionIndices =
-            file.m_revisionDescriptor->m_processedNamedFunctions.get_items_for_processing(
-                span<const IndexT>{file.m_selectedNamedFunctionIndices});
-
-        if (!namedFunctionIndices.empty())
-        {
-            process_named_functions_async(file.m_revisionDescriptor, namedFunctionIndices);
-        }
-    }
+    process_leftover_named_and_matched_functions_async(descriptor, {descriptor.m_selectedMatchedFunctionIndices});
+    process_leftover_named_functions_async(file.m_revisionDescriptor, {file.m_selectedUnmatchedNamedFunctionIndices});
 }
 
 std::string ImGuiApp::create_section_string(uint32_t section_index, const ExeSections *sections)
@@ -2089,31 +2125,62 @@ void ImGuiApp::ComparisonManagerFilesList(ProgramComparisonDescriptor::File &fil
 
 void ImGuiApp::ComparisonManagerFilesActions(ProgramComparisonDescriptor &descriptor)
 {
+    ComparisonManagerFilesCompareButton(descriptor);
+    ImGui::SameLine();
+    ComparisonManagerFilesProcessFunctionsCheckbox(descriptor);
+}
+
+void ImGuiApp::ComparisonManagerFilesCompareButton(ProgramComparisonDescriptor &descriptor)
+{
     const IndexT selectedFileIdx0 = descriptor.m_files[0].m_imguiSelectedFileIdx;
     const IndexT selectedFileIdx1 = descriptor.m_files[1].m_imguiSelectedFileIdx;
     ProgramFileDescriptor *fileDescriptor0 = get_program_file_descriptor(selectedFileIdx0);
     ProgramFileDescriptor *fileDescriptor1 = get_program_file_descriptor(selectedFileIdx1);
 
-    if (fileDescriptor0 != nullptr && fileDescriptor1 != nullptr)
+    const bool canCompare0 = fileDescriptor0 && (fileDescriptor0->can_load() || fileDescriptor0->exe_loaded());
+    const bool canCompare1 = fileDescriptor1 && (fileDescriptor1->can_load() || fileDescriptor1->exe_loaded());
+    ImScoped::Disabled disabled(!(canCompare0 && canCompare1));
+    // Change button color.
+    ImScoped::StyleColor color1(ImGuiCol_Button, (ImVec4)ImColor::HSV(0.5f, 0.6f, 0.6f));
+    ImScoped::StyleColor color2(ImGuiCol_ButtonHovered, (ImVec4)ImColor::HSV(0.5f, 0.8f, 0.8f));
+    ImScoped::StyleColor color3(ImGuiCol_ButtonActive, (ImVec4)ImColor::HSV(0.5f, 1.0f, 1.0f));
+    // Change text color too to make it readable with the light ImGui color theme.
+    ImScoped::StyleColor text_color1(ImGuiCol_Text, ImVec4(1.00f, 1.00f, 1.00f, 1.00f));
+    ImScoped::StyleColor text_color2(ImGuiCol_TextDisabled, ImVec4(0.50f, 0.50f, 0.50f, 1.00f));
+    if (Button("Compare"))
     {
-        const bool canCompare0 = fileDescriptor0->can_load() || fileDescriptor0->exe_loaded();
-        const bool canCompare1 = fileDescriptor1->can_load() || fileDescriptor1->exe_loaded();
-        ImScoped::Disabled disabled(!(canCompare0 && canCompare1));
-        // Change button color.
-        ImScoped::StyleColor color1(ImGuiCol_Button, (ImVec4)ImColor::HSV(0.5f, 0.6f, 0.6f));
-        ImScoped::StyleColor color2(ImGuiCol_ButtonHovered, (ImVec4)ImColor::HSV(0.5f, 0.8f, 0.8f));
-        ImScoped::StyleColor color3(ImGuiCol_ButtonActive, (ImVec4)ImColor::HSV(0.5f, 1.0f, 1.0f));
-        // Change text color too to make it readable with the light ImGui color theme.
-        ImScoped::StyleColor text_color1(ImGuiCol_Text, ImVec4(1.00f, 1.00f, 1.00f, 1.00f));
-        ImScoped::StyleColor text_color2(ImGuiCol_TextDisabled, ImVec4(0.50f, 0.50f, 0.50f, 1.00f));
-        if (Button("Compare"))
-        {
-            load_and_init_comparison_async({fileDescriptor0, fileDescriptor1}, &descriptor);
-        }
-
-        // #TODO: Add button to disassemble and compare all matched functions.
-        // #TODO: Add button to disassemble all unmatched functions.
+        load_and_init_comparison_async({fileDescriptor0, fileDescriptor1}, &descriptor);
     }
+    ImGui::SameLine();
+    TooltipTextUnformattedMarker("Initiates a new comparison of the selected file revisions.");
+}
+
+void ImGuiApp::ComparisonManagerFilesProcessFunctionsCheckbox(ProgramComparisonDescriptor &descriptor)
+{
+    if (ImGui::Checkbox("Process Matched Functions", &descriptor.m_imguiProcessMatchedFunctionsImmediately))
+    {
+        if (descriptor.m_imguiProcessMatchedFunctionsImmediately && descriptor.bundles_ready())
+        {
+            process_all_leftover_named_and_matched_functions_async(descriptor);
+        }
+    }
+    ImGui::SameLine();
+    TooltipTextUnformattedMarker(
+        "When enabled, disassembles and compares all matched functions right away. "
+        "Otherwise, disassembles and compares them on demand.");
+
+    ImGui::SameLine();
+    if (ImGui::Checkbox("Process Unmatched Functions", &descriptor.m_imguiProcessUnmatchedFunctionsImmediately))
+    {
+        if (descriptor.m_imguiProcessUnmatchedFunctionsImmediately && descriptor.bundles_ready())
+        {
+            process_all_leftover_named_functions_async(descriptor);
+        }
+    }
+    ImGui::SameLine();
+    TooltipTextUnformattedMarker(
+        "When enabled, disassembles all unmatched functions right away. "
+        "Otherwise, disassembles them on demand.");
 }
 
 void ImGuiApp::ComparisonManagerFilesProgressOverlay(const ProgramComparisonDescriptor &descriptor, const ImRect &rect)
@@ -2500,7 +2567,7 @@ void ImGuiApp::ComparisonManagerFunctionEntriesControls(ProgramComparisonDescrip
 
         ImGui::DragInt("Page Size", &descriptor.m_imguiPageSize, 0.5f, 1, 100, "%d", ImGuiSliderFlags_AlwaysClamp);
         ImGui::SameLine();
-        TooltipTextMarker(
+        TooltipTextUnformattedMarker(
             "Click and drag to edit value.\n"
             "Hold SHIFT/ALT for faster/slower edit.\n"
             "Double-click or CTRL+click to input value.");
@@ -2514,7 +2581,7 @@ void ImGuiApp::ComparisonManagerFunctionEntriesControls(ProgramComparisonDescrip
         ImGui::SameLine();
         ImGui::SliderInt("Page Select", &descriptor.m_imguiSelectedPage, 1, pageCount, "%d", ImGuiSliderFlags_AlwaysClamp);
         ImGui::SameLine();
-        TooltipTextMarker("CTRL+click to input value.");
+        TooltipTextUnformattedMarker("CTRL+click to input value.");
     }
 }
 
@@ -2648,6 +2715,7 @@ void ImGuiApp::ComparisonManagerMatchedFunctionContentTable(
         const auto PrintAsmInstructionColumns = leftSide ? PrintAsmInstructionColumnsLeft : PrintAsmInstructionColumnsRight;
         const auto PrintAsmLabelColumns = leftSide ? PrintAsmLabelColumnsLeft : PrintAsmLabelColumnsRight;
 
+        // #TODO: Implement coloring for matches and mismatches.
         // #TODO: Add feature to auto hide columns by default.
         // #TODO: Add feature to change default or current width of columns.
         // #TODO: Simplify this. Put in a struct maybe. Have array of elements that can be ordered.
