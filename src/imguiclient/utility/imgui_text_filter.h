@@ -12,6 +12,7 @@
  */
 #pragma once
 
+#include "commontypes.h"
 #include <functional>
 #include <imgui.h>
 #include <string_view>
@@ -21,7 +22,7 @@ struct ImGuiTextFilterEx : public ImGuiTextFilter
     bool Draw(const char *key, const char *label = "Filter (inc,-exc)", float width = 0.0f);
     bool PassFilter(std::string_view view) const;
 
-    bool hasExternalFilterCondition = false; // Set true if the filter callback has more than just the text to filter with.
+    bool hasExternalFilterCondition = false;
 };
 
 namespace unassemblize::gui
@@ -29,31 +30,103 @@ namespace unassemblize::gui
 template<typename Type>
 struct TextFilterDescriptor
 {
+    template<typename SourceContainerValueType>
+    using FilterCallback = std::function<bool(const ImGuiTextFilterEx &filter, const SourceContainerValueType &value)>;
     using FilterType = Type;
 
-    TextFilterDescriptor(const char *key) : key(key) {}
+    TextFilterDescriptor(const char *key) : m_key(key) {}
+
+    bool DrawFilter();
+
+    template<typename Container>
+    void UpdateFilter(const Container &source, FilterCallback<typename Container::value_type> &&filterCallback);
+
+    template<typename Container>
+    bool DrawAndUpdateFilter(const Container &source, FilterCallback<typename Container::value_type> &&filterCallback);
+
+    span<const FilterType> Filtered() const;
 
     // Clears the filtered state but does not reset the user specified filter words.
-    void reset()
-    {
-        filtered.clear();
-        filteredOnce = false;
-    }
+    void Reset();
 
-    void set_external_filter_condition(bool value) { filter.hasExternalFilterCondition = value; }
-    bool needs_update() const { return !filteredOnce; }
+    // Set true if the filter callback has more than just the text to filter with.
+    void SetExternalFilterCondition(bool value);
 
-    const char *const key;
-    ImGuiTextFilterEx filter; // The filter state for the input field.
-    ImVector<FilterType> filtered; // Array to the filtered elements after an update.
-    bool filteredOnce = false; // Set true to force the next draw to update the filtered state.
+private:
+    bool NeedsUpdate() const;
+
+    template<typename Container>
+    static void UpdateFilter(
+        ImVector<FilterType> &filtered,
+        const ImGuiTextFilterEx &filter,
+        const Container &source,
+        FilterCallback<typename Container::value_type> &&filterCallback);
+
+private:
+    const char *const m_key;
+    ImGuiTextFilterEx m_filter; // The filter state for the input field.
+    ImVector<FilterType> m_filtered; // Array to the filtered elements after an update.
+    bool m_filteredOnce = false; // Set false to force the next draw to update the filtered state.
 };
 
-template<typename SourceContainerValueType>
-using FilterCallback = std::function<bool(const ImGuiTextFilterEx &filter, const SourceContainerValueType &value)>;
+template<typename Type>
+bool TextFilterDescriptor<Type>::DrawFilter()
+{
+    return m_filter.Draw(m_key) || NeedsUpdate();
+}
 
-template<typename FilterType, typename Container>
-void UpdateFilter(
+template<typename Type>
+template<typename Container>
+void TextFilterDescriptor<Type>::UpdateFilter(
+    const Container &source,
+    FilterCallback<typename Container::value_type> &&filterCallback)
+{
+    UpdateFilter(m_filtered, m_filter, source, std::move(filterCallback));
+    m_filteredOnce = true;
+}
+
+template<typename Type>
+template<typename Container>
+bool TextFilterDescriptor<Type>::DrawAndUpdateFilter(
+    const Container &source,
+    FilterCallback<typename Container::value_type> &&filterCallback)
+{
+    if (DrawFilter())
+    {
+        UpdateFilter(source, std::move(filterCallback));
+        return true;
+    }
+    return false;
+}
+
+template<typename Type>
+span<const Type> TextFilterDescriptor<Type>::Filtered() const
+{
+    return {m_filtered.begin(), m_filtered.end()};
+}
+
+template<typename Type>
+void TextFilterDescriptor<Type>::Reset()
+{
+    m_filtered.clear();
+    m_filteredOnce = false;
+}
+
+template<typename Type>
+void TextFilterDescriptor<Type>::SetExternalFilterCondition(bool value)
+{
+    m_filter.hasExternalFilterCondition = value;
+}
+
+template<typename Type>
+bool TextFilterDescriptor<Type>::NeedsUpdate() const
+{
+    return !m_filteredOnce;
+}
+
+template<typename Type>
+template<typename Container>
+void TextFilterDescriptor<Type>::UpdateFilter(
     ImVector<FilterType> &filtered,
     const ImGuiTextFilterEx &filter,
     const Container &source,
@@ -87,37 +160,6 @@ void UpdateFilter(
                 filtered[i] = source[i];
         }
     }
-}
-
-template<typename Descriptor>
-bool DrawFilter(Descriptor &descriptor)
-{
-    return descriptor.filter.Draw(descriptor.key) || descriptor.needs_update();
-}
-
-template<typename Descriptor, typename Container>
-void UpdateFilter(
-    Descriptor &descriptor,
-    const Container &source,
-    FilterCallback<typename Container::value_type> &&filterCallback)
-{
-    using FilterType = typename Descriptor::FilterType;
-    UpdateFilter<FilterType>(descriptor.filtered, descriptor.filter, source, std::move(filterCallback));
-    descriptor.filteredOnce = true;
-}
-
-template<typename Descriptor, typename Container>
-bool DrawAndUpdateFilter(
-    Descriptor &descriptor,
-    const Container &source,
-    FilterCallback<typename Container::value_type> &&filterCallback)
-{
-    if (DrawFilter(descriptor))
-    {
-        UpdateFilter(descriptor, source, std::move(filterCallback));
-        return true;
-    }
-    return false;
 }
 
 } // namespace unassemblize::gui

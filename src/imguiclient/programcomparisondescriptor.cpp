@@ -70,8 +70,8 @@ void ProgramComparisonDescriptor::File::prepare_rebuild()
 {
     assert(!has_async_work());
 
-    m_bundlesFilter.reset();
-    m_functionIndicesFilter.reset();
+    m_bundlesFilter.Reset();
+    m_functionIndicesFilter.Reset();
 
     m_revisionDescriptor.reset();
 
@@ -267,26 +267,28 @@ ImGuiSelectionBasicStorage &ProgramComparisonDescriptor::File::get_bundles_selec
 
 const NamedFunctionBundle &ProgramComparisonDescriptor::File::get_filtered_bundle(int index) const
 {
-    return *m_bundlesFilter.filtered[index];
+    const auto filtered = m_bundlesFilter.Filtered();
+    assert(index < filtered.size());
+    return *filtered[index];
 }
 
 const ProgramComparisonDescriptor::File::NamedFunctionBundleUiInfo &ProgramComparisonDescriptor::File::
     get_filtered_bundle_ui_info(int index) const
 {
     const span<const NamedFunctionBundleUiInfo> bundleUiInfos = get_bundle_ui_infos(get_selected_bundle_type());
-    const IndexT bundleIndex = m_bundlesFilter.filtered[index]->id;
+    const IndexT bundleIndex = get_filtered_bundle(index).id;
     assert(bundleIndex < bundleUiInfos.size());
     return bundleUiInfos[bundleIndex];
 }
 
 void ProgramComparisonDescriptor::File::on_bundles_changed()
 {
-    m_bundlesFilter.reset();
+    m_bundlesFilter.Reset();
 }
 
 void ProgramComparisonDescriptor::File::on_bundles_interaction()
 {
-    m_functionIndicesFilter.reset();
+    m_functionIndicesFilter.Reset();
 
     update_selected_bundles();
     update_active_named_functions();
@@ -322,9 +324,8 @@ void ProgramComparisonDescriptor::File::update_selected_bundles()
     selectedBundles.reserve(selection.Size);
 
     // Uses lookup set. Is much faster than linear search over elements.
-    const std::unordered_set<const NamedFunctionBundle *> filteredSet(
-        m_bundlesFilter.filtered.begin(),
-        m_bundlesFilter.filtered.end());
+    const auto filtered = m_bundlesFilter.Filtered();
+    const std::unordered_set<const NamedFunctionBundle *> filteredSet(filtered.begin(), filtered.end());
 
     void *it = nullptr;
     ImGuiID id;
@@ -408,9 +409,8 @@ void ProgramComparisonDescriptor::File::update_selected_named_functions()
     selectedUnmatchedNamedFunctionIndices.reserve(m_imguiFunctionsSelection.Size);
 
     // Uses lookup set. Is much faster than linear search over elements.
-    const std::unordered_set<IndexT> filteredSet(
-        m_functionIndicesFilter.filtered.begin(),
-        m_functionIndicesFilter.filtered.end());
+    const auto filtered = m_functionIndicesFilter.Filtered();
+    const std::unordered_set<IndexT> filteredSet(filtered.begin(), filtered.end());
 
     void *it = nullptr;
     ImGuiID id;
@@ -450,14 +450,14 @@ span<const IndexT> ProgramComparisonDescriptor::File::get_active_named_function_
 
 const NamedFunction &ProgramComparisonDescriptor::File::get_filtered_named_function(int index) const
 {
-    const auto &filtered = m_functionIndicesFilter.filtered;
+    const auto filtered = m_functionIndicesFilter.Filtered();
     assert(index < filtered.size());
     return m_revisionDescriptor->m_namedFunctions[filtered[index]];
 }
 
 const NamedFunctionMatchInfo &ProgramComparisonDescriptor::File::get_filtered_named_function_match_info(int index) const
 {
-    const auto &filtered = m_functionIndicesFilter.filtered;
+    const auto filtered = m_functionIndicesFilter.Filtered();
     assert(index < filtered.size());
     return m_namedFunctionMatchInfos[filtered[index]];
 }
@@ -465,7 +465,7 @@ const NamedFunctionMatchInfo &ProgramComparisonDescriptor::File::get_filtered_na
 const ProgramComparisonDescriptor::File::NamedFunctionUiInfo &ProgramComparisonDescriptor::File::
     get_filtered_named_function_ui_info(int index) const
 {
-    const auto &filtered = m_functionIndicesFilter.filtered;
+    const auto filtered = m_functionIndicesFilter.Filtered();
     assert(index < filtered.size());
     return m_namedFunctionUiInfos[filtered[index]];
 }

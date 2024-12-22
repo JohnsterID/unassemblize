@@ -170,9 +170,9 @@ ProgramFileRevisionId ProgramFileDescriptor::get_revision_id() const
 
 void ProgramFileDescriptor::create_new_revision_descriptor()
 {
-    m_exeSymbolsFilter.reset();
-    m_pdbSymbolsFilter.reset();
-    m_pdbFunctionsFilter.reset();
+    m_exeSymbolsFilter.Reset();
+    m_pdbSymbolsFilter.Reset();
+    m_pdbFunctionsFilter.Reset();
 
     m_revisionDescriptor = std::make_shared<ProgramFileRevisionDescriptor>();
     m_revisionDescriptor->m_exeFilenameCopy = m_exeFilename;

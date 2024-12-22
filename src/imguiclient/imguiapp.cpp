@@ -1075,7 +1075,7 @@ void ImGuiApp::update_bundles_interaction(ProgramComparisonDescriptor::File &fil
         return filter.PassFilter(bundle.name);
     };
 
-    UpdateFilter(file.m_bundlesFilter, bundles, filterCallback);
+    file.m_bundlesFilter.UpdateFilter(bundles, filterCallback);
 
     file.on_bundles_interaction();
 }
@@ -1096,7 +1096,7 @@ void ImGuiApp::update_functions_interaction(ProgramComparisonDescriptor &descrip
         return filter.PassFilter(namedFunctions[index].name);
     };
 
-    UpdateFilter(file.m_functionIndicesFilter, functionIndices, filterCallback);
+    file.m_functionIndicesFilter.UpdateFilter(functionIndices, filterCallback);
 
     on_functions_interaction(descriptor, file);
 }
@@ -1742,12 +1742,11 @@ void ImGuiApp::FileManagerInfoExeSymbols(
 {
     ImGui::SeparatorText("Exe Symbols");
 
-    const auto &filtered = fileDescriptor.m_exeSymbolsFilter.filtered;
+    const auto filtered = fileDescriptor.m_exeSymbolsFilter.Filtered();
     {
         const ExeSymbols &symbols = revisionDescriptor.m_executable->get_symbols();
 
-        DrawAndUpdateFilter(
-            fileDescriptor.m_exeSymbolsFilter,
+        fileDescriptor.m_exeSymbolsFilter.DrawAndUpdateFilter(
             symbols,
             [](const ImGuiTextFilterEx &filter, const ExeSymbol &symbol) -> bool { return filter.PassFilter(symbol.name); });
 
@@ -1902,12 +1901,11 @@ void ImGuiApp::FileManagerInfoPdbSymbols(
 {
     ImGui::SeparatorText("Pdb Symbols");
 
-    const auto &filtered = fileDescriptor.m_pdbSymbolsFilter.filtered;
+    const auto filtered = fileDescriptor.m_pdbSymbolsFilter.Filtered();
     {
         const PdbSymbolInfoVector &symbols = revisionDescriptor.m_pdbReader->get_symbols();
 
-        DrawAndUpdateFilter(
-            fileDescriptor.m_pdbSymbolsFilter,
+        fileDescriptor.m_pdbSymbolsFilter.DrawAndUpdateFilter(
             symbols,
             [](const ImGuiTextFilterEx &filter, const PdbSymbolInfo &symbol) -> bool {
                 if (filter.PassFilter(symbol.decoratedName))
@@ -1984,12 +1982,11 @@ void ImGuiApp::FileManagerInfoPdbFunctions(
 {
     ImGui::SeparatorText("Pdb Functions");
 
-    const auto &filtered = fileDescriptor.m_pdbFunctionsFilter.filtered;
+    const auto filtered = fileDescriptor.m_pdbFunctionsFilter.Filtered();
     {
         const PdbFunctionInfoVector &functions = revisionDescriptor.m_pdbReader->get_functions();
 
-        DrawAndUpdateFilter(
-            fileDescriptor.m_pdbFunctionsFilter,
+        fileDescriptor.m_pdbFunctionsFilter.DrawAndUpdateFilter(
             functions,
             [](const ImGuiTextFilterEx &filter, const PdbFunctionInfo &function) -> bool {
                 if (filter.PassFilter(function.decoratedName))
@@ -2319,7 +2316,7 @@ void ImGuiApp::ComparisonManagerBundlesTypeSelection(ProgramComparisonDescriptor
 
 void ImGuiApp::ComparisonManagerBundlesFilter(ProgramComparisonDescriptor::File &file)
 {
-    const bool selectionChanged = DrawFilter(file.m_bundlesFilter);
+    const bool selectionChanged = file.m_bundlesFilter.DrawFilter();
 
     if (selectionChanged)
     {
@@ -2332,7 +2329,7 @@ void ImGuiApp::ComparisonManagerBundlesFilter(ProgramComparisonDescriptor::File 
 
     ImGui::Text(
         "Select Bundle(s) - Count: %d/%d, Selected: %d/%d",
-        file.m_bundlesFilter.filtered.size(),
+        file.m_bundlesFilter.Filtered().size(),
         int(bundles.size()),
         int(file.m_selectedBundles.size()),
         selection.Size);
@@ -2380,7 +2377,7 @@ void ImGuiApp::ComparisonManagerBundlesList(ProgramComparisonDescriptor::File &f
     {
         const MatchBundleType type = file.get_selected_bundle_type();
         ImGuiSelectionBasicStorage &selection = file.get_bundles_selection(type);
-        const int count = file.m_bundlesFilter.filtered.size();
+        const int count = file.m_bundlesFilter.Filtered().size();
         const int oldSelectionSize = selection.Size;
         bool selectionChanged = false;
         ImGuiMultiSelectIO *ms_io = ImGui::BeginMultiSelect(ImGuiMultiSelectFlags_BoxSelect1d, selection.Size, count);
@@ -2458,12 +2455,12 @@ void ImGuiApp::ComparisonManagerFunctionsFilter(
 
     if (selectionChanged)
     {
-        file.m_functionIndicesFilter.reset();
-        file.m_functionIndicesFilter.set_external_filter_condition(
+        file.m_functionIndicesFilter.Reset();
+        file.m_functionIndicesFilter.SetExternalFilterCondition(
             !file.m_imguiShowMatchedFunctions || !file.m_imguiShowUnmatchedFunctions);
     }
 
-    selectionChanged |= DrawFilter(file.m_functionIndicesFilter);
+    selectionChanged |= file.m_functionIndicesFilter.DrawFilter();
 
     if (selectionChanged)
     {
@@ -2474,7 +2471,7 @@ void ImGuiApp::ComparisonManagerFunctionsFilter(
 
     ImGui::Text(
         "Select Function(s) - Count: %d/%d, Selected: %d/%d",
-        file.m_functionIndicesFilter.filtered.size(),
+        file.m_functionIndicesFilter.Filtered().size(),
         int(functionIndices.size()),
         int(file.m_selectedNamedFunctionIndices.size()),
         file.m_imguiFunctionsSelection.Size);
@@ -2525,7 +2522,7 @@ void ImGuiApp::ComparisonManagerFunctionsList(
         assert(file.m_revisionDescriptor != nullptr);
         ImGuiSelectionBasicStorage &selection = file.m_imguiFunctionsSelection;
         const NamedFunctions &namedFunctions = file.m_revisionDescriptor->m_namedFunctions;
-        const int count = file.m_functionIndicesFilter.filtered.size();
+        const int count = file.m_functionIndicesFilter.Filtered().size();
         const int oldSelectionSize = selection.Size;
         bool selectionChanged = false;
         ImGuiMultiSelectIO *ms_io = ImGui::BeginMultiSelect(ImGuiMultiSelectFlags_BoxSelect1d, selection.Size, count);
