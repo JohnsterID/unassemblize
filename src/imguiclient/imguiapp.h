@@ -182,6 +182,8 @@ private:
     void add_program_comparison();
     void update_closed_program_comparisons();
 
+    void update_bundles_interaction(ProgramComparisonDescriptor::File &file);
+    void update_functions_interaction(ProgramComparisonDescriptor &descriptor, ProgramComparisonDescriptor::File &file);
     void on_functions_interaction(ProgramComparisonDescriptor &descriptor, ProgramComparisonDescriptor::File &file);
 
     static std::string create_section_string(uint32_t section_index, const ExeSections *sections);

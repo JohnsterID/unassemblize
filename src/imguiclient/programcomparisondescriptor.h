@@ -94,15 +94,15 @@ struct ProgramComparisonDescriptor
 
         void update_bundle_ui_infos(MatchBundleType type);
         void update_selected_bundles();
-        void update_active_functions(); // Requires prior call to update_selected_bundles()
+        void update_active_named_functions(); // Requires prior call to update_selected_bundles()
+        void update_active_named_function_ui_infos();
         void update_named_function_ui_infos(span<const IndexT> namedFunctionIndices);
+        void update_selected_named_functions();
 
         span<const IndexT> get_active_named_function_indices() const;
         const NamedFunction &get_filtered_named_function(int index) const;
         const NamedFunctionMatchInfo &get_filtered_named_function_match_info(int index) const;
         const NamedFunctionUiInfo &get_filtered_named_function_ui_info(int index) const;
-
-        void update_selected_named_functions();
 
         WorkState m_asyncWorkState;
 

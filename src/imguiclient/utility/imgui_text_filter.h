@@ -33,6 +33,7 @@ struct TextFilterDescriptor
 
     TextFilterDescriptor(const char *key) : key(key) {}
 
+    // Clears the filtered state but does not reset the user specified filter words.
     void reset()
     {
         filtered.clear();
@@ -40,11 +41,12 @@ struct TextFilterDescriptor
     }
 
     void set_external_filter_condition(bool value) { filter.hasExternalFilterCondition = value; }
+    bool needs_update() const { return !filteredOnce; }
 
     const char *const key;
-    ImGuiTextFilterEx filter;
-    ImVector<FilterType> filtered;
-    bool filteredOnce = false;
+    ImGuiTextFilterEx filter; // The filter state for the input field.
+    ImVector<FilterType> filtered; // Array to the filtered elements after an update.
+    bool filteredOnce = false; // Set true to force the next draw to update the filtered state.
 };
 
 template<typename SourceContainerValueType>
@@ -87,20 +89,35 @@ void UpdateFilter(
     }
 }
 
+template<typename Descriptor>
+bool DrawFilter(Descriptor &descriptor)
+{
+    return descriptor.filter.Draw(descriptor.key) || descriptor.needs_update();
+}
+
 template<typename Descriptor, typename Container>
-bool UpdateFilter(
+void UpdateFilter(
     Descriptor &descriptor,
     const Container &source,
     FilterCallback<typename Container::value_type> &&filterCallback)
 {
     using FilterType = typename Descriptor::FilterType;
-    const bool changed = descriptor.filter.Draw(descriptor.key) || !descriptor.filteredOnce;
-    if (changed)
+    UpdateFilter<FilterType>(descriptor.filtered, descriptor.filter, source, std::move(filterCallback));
+    descriptor.filteredOnce = true;
+}
+
+template<typename Descriptor, typename Container>
+bool DrawAndUpdateFilter(
+    Descriptor &descriptor,
+    const Container &source,
+    FilterCallback<typename Container::value_type> &&filterCallback)
+{
+    if (DrawFilter(descriptor))
     {
-        UpdateFilter<FilterType>(descriptor.filtered, descriptor.filter, source, std::move(filterCallback));
-        descriptor.filteredOnce = true;
+        UpdateFilter(descriptor, source, std::move(filterCallback));
+        return true;
     }
-    return changed;
+    return false;
 }
 
 } // namespace unassemblize::gui

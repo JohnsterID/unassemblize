@@ -289,9 +289,9 @@ void ProgramComparisonDescriptor::File::on_bundles_interaction()
     m_functionIndicesFilter.reset();
 
     update_selected_bundles();
-    update_active_functions();
+    update_active_named_functions();
     // Perhaps the ui infos should be build once earlier and not on every bundle interaction?
-    update_named_function_ui_infos(get_active_named_function_indices());
+    update_active_named_function_ui_infos();
 }
 
 void ProgramComparisonDescriptor::File::update_bundle_ui_infos(MatchBundleType type)
@@ -342,7 +342,7 @@ void ProgramComparisonDescriptor::File::update_selected_bundles()
     m_selectedBundles = std::move(selectedBundles);
 }
 
-void ProgramComparisonDescriptor::File::update_active_functions()
+void ProgramComparisonDescriptor::File::update_active_named_functions()
 {
     std::vector<IndexT> activeAllNamedFunctions;
 
@@ -379,6 +379,11 @@ void ProgramComparisonDescriptor::File::update_active_functions()
     m_activeNamedFunctionIndices = std::move(activeAllNamedFunctions);
 }
 
+void ProgramComparisonDescriptor::File::update_active_named_function_ui_infos()
+{
+    update_named_function_ui_infos(get_active_named_function_indices());
+}
+
 void ProgramComparisonDescriptor::File::update_named_function_ui_infos(span<const IndexT> namedFunctionIndices)
 {
     for (IndexT functionIndex : namedFunctionIndices)
@@ -389,6 +394,42 @@ void ProgramComparisonDescriptor::File::update_named_function_ui_infos(span<cons
 
         uiInfo.update_info(namedFunction.name, namedFunction.id, matchInfo.is_matched());
     }
+}
+
+void ProgramComparisonDescriptor::File::update_selected_named_functions()
+{
+    assert(named_functions_built());
+
+    std::vector<IndexT> selectedAllNamedFunctionIndices;
+    std::vector<IndexT> selectedUnmatchedNamedFunctionIndices;
+
+    // Reservation size typically matches selection size, but could be larger.
+    selectedAllNamedFunctionIndices.reserve(m_imguiFunctionsSelection.Size);
+    selectedUnmatchedNamedFunctionIndices.reserve(m_imguiFunctionsSelection.Size);
+
+    // Uses lookup set. Is much faster than linear search over elements.
+    const std::unordered_set<IndexT> filteredSet(
+        m_functionIndicesFilter.filtered.begin(),
+        m_functionIndicesFilter.filtered.end());
+
+    void *it = nullptr;
+    ImGuiID id;
+    while (m_imguiFunctionsSelection.GetNextSelectedItem(&it, &id))
+    {
+        if (filteredSet.count(IndexT(id)) == 0)
+            continue;
+
+        selectedAllNamedFunctionIndices.push_back(IndexT(id));
+
+        if (!is_matched_function(IndexT(id)))
+        {
+            selectedUnmatchedNamedFunctionIndices.push_back(IndexT(id));
+        }
+    }
+
+    m_selectedNamedFunctionIndices = std::move(selectedAllNamedFunctionIndices);
+    m_selectedUnmatchedNamedFunctionIndices = std::move(selectedUnmatchedNamedFunctionIndices);
+    m_selectedUnmatchedNamedFunctionIndices.shrink_to_fit();
 }
 
 span<const IndexT> ProgramComparisonDescriptor::File::get_active_named_function_indices() const
@@ -427,42 +468,6 @@ const ProgramComparisonDescriptor::File::NamedFunctionUiInfo &ProgramComparisonD
     const auto &filtered = m_functionIndicesFilter.filtered;
     assert(index < filtered.size());
     return m_namedFunctionUiInfos[filtered[index]];
-}
-
-void ProgramComparisonDescriptor::File::update_selected_named_functions()
-{
-    assert(named_functions_built());
-
-    std::vector<IndexT> selectedAllNamedFunctionIndices;
-    std::vector<IndexT> selectedUnmatchedNamedFunctionIndices;
-
-    // Reservation size typically matches selection size, but could be larger.
-    selectedAllNamedFunctionIndices.reserve(m_imguiFunctionsSelection.Size);
-    selectedUnmatchedNamedFunctionIndices.reserve(m_imguiFunctionsSelection.Size);
-
-    // Uses lookup set. Is much faster than linear search over elements.
-    const std::unordered_set<IndexT> filteredSet(
-        m_functionIndicesFilter.filtered.begin(),
-        m_functionIndicesFilter.filtered.end());
-
-    void *it = nullptr;
-    ImGuiID id;
-    while (m_imguiFunctionsSelection.GetNextSelectedItem(&it, &id))
-    {
-        if (filteredSet.count(IndexT(id)) == 0)
-            continue;
-
-        selectedAllNamedFunctionIndices.push_back(IndexT(id));
-
-        if (!is_matched_function(IndexT(id)))
-        {
-            selectedUnmatchedNamedFunctionIndices.push_back(IndexT(id));
-        }
-    }
-
-    m_selectedNamedFunctionIndices = std::move(selectedAllNamedFunctionIndices);
-    m_selectedUnmatchedNamedFunctionIndices = std::move(selectedUnmatchedNamedFunctionIndices);
-    m_selectedUnmatchedNamedFunctionIndices.shrink_to_fit();
 }
 
 void ProgramComparisonDescriptor::prepare_rebuild()

@@ -770,6 +770,16 @@ void ImGuiApp::init_comparison_async(ProgramComparisonDescriptor *comparisonDesc
 
         comparisonDescriptor->init();
 
+        // Update bundles and functions on both sides always.
+        // Otherwise these would not update after a second comparison
+        // if the bundles and/or functions sections were collapsed.
+        for (IndexT i = 0; i < 2; ++i)
+        {
+            ProgramComparisonDescriptor::File &file = comparisonDescriptor->m_files[i];
+            update_bundles_interaction(file);
+            update_functions_interaction(*comparisonDescriptor, file);
+        }
+
         // Queue the next optional commands.
 
         if (comparisonDescriptor->m_imguiProcessMatchedFunctionsImmediately)
@@ -1052,6 +1062,43 @@ void ImGuiApp::update_closed_program_comparisons()
             m_programComparisons.end(),
             [](const ProgramComparisonDescriptorPtr &p) { return !p->m_imguiHasOpenWindow && !p->has_async_work(); }),
         m_programComparisons.end());
+}
+
+void ImGuiApp::update_bundles_interaction(ProgramComparisonDescriptor::File &file)
+{
+    assert(file.bundles_ready());
+
+    const MatchBundleType type = file.get_selected_bundle_type();
+    const span<const NamedFunctionBundle> bundles = file.get_bundles(type);
+
+    const auto filterCallback = [](const ImGuiTextFilterEx &filter, const NamedFunctionBundle &bundle) -> bool {
+        return filter.PassFilter(bundle.name);
+    };
+
+    UpdateFilter(file.m_bundlesFilter, bundles, filterCallback);
+
+    file.on_bundles_interaction();
+}
+
+void ImGuiApp::update_functions_interaction(ProgramComparisonDescriptor &descriptor, ProgramComparisonDescriptor::File &file)
+{
+    assert(file.named_functions_built());
+
+    const span<const IndexT> functionIndices = file.get_active_named_function_indices();
+    const NamedFunctions &namedFunctions = file.m_revisionDescriptor->m_namedFunctions;
+
+    const auto filterCallback = [&](const ImGuiTextFilterEx &filter, IndexT index) -> bool {
+        bool isMatched = file.is_matched_function(index);
+        if (isMatched && !file.m_imguiShowMatchedFunctions)
+            return false;
+        if (!isMatched && !file.m_imguiShowUnmatchedFunctions)
+            return false;
+        return filter.PassFilter(namedFunctions[index].name);
+    };
+
+    UpdateFilter(file.m_functionIndicesFilter, functionIndices, filterCallback);
+
+    on_functions_interaction(descriptor, file);
 }
 
 void ImGuiApp::on_functions_interaction(ProgramComparisonDescriptor &descriptor, ProgramComparisonDescriptor::File &file)
@@ -1699,7 +1746,7 @@ void ImGuiApp::FileManagerInfoExeSymbols(
     {
         const ExeSymbols &symbols = revisionDescriptor.m_executable->get_symbols();
 
-        UpdateFilter(
+        DrawAndUpdateFilter(
             fileDescriptor.m_exeSymbolsFilter,
             symbols,
             [](const ImGuiTextFilterEx &filter, const ExeSymbol &symbol) -> bool { return filter.PassFilter(symbol.name); });
@@ -1859,7 +1906,7 @@ void ImGuiApp::FileManagerInfoPdbSymbols(
     {
         const PdbSymbolInfoVector &symbols = revisionDescriptor.m_pdbReader->get_symbols();
 
-        UpdateFilter(
+        DrawAndUpdateFilter(
             fileDescriptor.m_pdbSymbolsFilter,
             symbols,
             [](const ImGuiTextFilterEx &filter, const PdbSymbolInfo &symbol) -> bool {
@@ -1941,7 +1988,7 @@ void ImGuiApp::FileManagerInfoPdbFunctions(
     {
         const PdbFunctionInfoVector &functions = revisionDescriptor.m_pdbReader->get_functions();
 
-        UpdateFilter(
+        DrawAndUpdateFilter(
             fileDescriptor.m_pdbFunctionsFilter,
             functions,
             [](const ImGuiTextFilterEx &filter, const PdbFunctionInfo &function) -> bool {
@@ -2272,21 +2319,16 @@ void ImGuiApp::ComparisonManagerBundlesTypeSelection(ProgramComparisonDescriptor
 
 void ImGuiApp::ComparisonManagerBundlesFilter(ProgramComparisonDescriptor::File &file)
 {
-    const MatchBundleType type = file.get_selected_bundle_type();
-    const ImGuiSelectionBasicStorage &selection = file.get_bundles_selection(type);
-    const span<const NamedFunctionBundle> bundles = file.get_bundles(type);
-
-    const bool selectionChanged = UpdateFilter(
-        file.m_bundlesFilter,
-        bundles,
-        [](const ImGuiTextFilterEx &filter, const NamedFunctionBundle &bundle) -> bool {
-            return filter.PassFilter(bundle.name);
-        });
+    const bool selectionChanged = DrawFilter(file.m_bundlesFilter);
 
     if (selectionChanged)
     {
-        file.on_bundles_interaction();
+        update_bundles_interaction(file);
     }
+
+    const MatchBundleType type = file.get_selected_bundle_type();
+    const ImGuiSelectionBasicStorage &selection = file.get_bundles_selection(type);
+    const span<const NamedFunctionBundle> bundles = file.get_bundles(type);
 
     ImGui::Text(
         "Select Bundle(s) - Count: %d/%d, Selected: %d/%d",
@@ -2421,27 +2463,14 @@ void ImGuiApp::ComparisonManagerFunctionsFilter(
             !file.m_imguiShowMatchedFunctions || !file.m_imguiShowUnmatchedFunctions);
     }
 
-    assert(file.m_revisionDescriptor != nullptr);
-    const span<const IndexT> functionIndices = file.get_active_named_function_indices();
-    const NamedFunctions &namedFunctions = file.m_revisionDescriptor->m_namedFunctions;
-
-    selectionChanged |= UpdateFilter(
-        file.m_functionIndicesFilter,
-        functionIndices,
-        [&](const ImGuiTextFilterEx &filter, IndexT index) -> bool {
-            bool isMatched = file.is_matched_function(index);
-            if (isMatched && !file.m_imguiShowMatchedFunctions)
-                return false;
-            if (!isMatched && !file.m_imguiShowUnmatchedFunctions)
-                return false;
-            return filter.PassFilter(namedFunctions[index].name);
-        });
+    selectionChanged |= DrawFilter(file.m_functionIndicesFilter);
 
     if (selectionChanged)
     {
-        // #TODO: bundles and functions are not updated if hidden and files are compared anew
-        on_functions_interaction(descriptor, file);
+        update_functions_interaction(descriptor, file);
     }
+
+    const span<const IndexT> functionIndices = file.get_active_named_function_indices();
 
     ImGui::Text(
         "Select Function(s) - Count: %d/%d, Selected: %d/%d",
