@@ -432,16 +432,6 @@ void AsmPrinter::append_comparison(
     const AsmComparisonRecords &records,
     AsmMatchStrictness match_strictness)
 {
-    constexpr std::string_view equal = " == ";
-    constexpr std::string_view unequal = " xx ";
-    constexpr std::string_view maybe_equal = " ?? ";
-    constexpr std::string_view left_missing = " >> ";
-    constexpr std::string_view right_missing = " << ";
-    static_assert(equal.size() == unequal.size(), "Expects same length");
-    static_assert(equal.size() == maybe_equal.size(), "Expects same length");
-    static_assert(equal.size() == left_missing.size(), "Expects same length");
-    static_assert(equal.size() == right_missing.size(), "Expects same length");
-
     assert(buffers.lines.size() == records.size());
 
     const size_t count = records.size();
@@ -453,47 +443,15 @@ void AsmPrinter::append_comparison(
 
         if (const AsmInstructionPair *instruction_pair = std::get_if<AsmInstructionPair>(&record))
         {
-            const AsmMatchValue match_value = instruction_pair->mismatch_info.get_match_value(match_strictness);
+            const AsmMatchValueEx match_value = instruction_pair->mismatch_info.get_match_value_ex(match_strictness);
 
-            switch (match_value)
-            {
-                case AsmMatchValue::IsMatch:
-                    line.append(equal);
-                    break;
-
-                case AsmMatchValue::IsMaybeMatch:
-                    line.append(maybe_equal);
-                    break;
-
-                case AsmMatchValue::IsMismatch: {
-                    const AsmInstruction *instruction0 = instruction_pair->pair[0];
-                    const AsmInstruction *instruction1 = instruction_pair->pair[1];
-                    if (instruction0 != nullptr && instruction1 != nullptr)
-                    {
-                        line.append(unequal);
-                    }
-                    else if (instruction0 == nullptr && instruction1 != nullptr)
-                    {
-                        line.append(left_missing);
-                    }
-                    else if (instruction0 != nullptr && instruction1 == nullptr)
-                    {
-                        line.append(right_missing);
-                    }
-                    else
-                    {
-                        assert(false);
-                    }
-                    break;
-                }
-                default:
-                    assert(false);
-                    break;
-            }
+            line.push_back(' ');
+            line.append(AsmMatchValueStringArray[size_t(match_value)]);
+            line.push_back(' ');
         }
         else if (const AsmLabelPair *label_pair = std::get_if<AsmLabelPair>(&record))
         {
-            append_whitespace_inplace(line, equal.size());
+            append_whitespace_inplace(line, AsmMatchValueStringArray[0].size() + 2);
         }
         else
         {

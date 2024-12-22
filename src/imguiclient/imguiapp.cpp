@@ -3199,52 +3199,10 @@ void ImGuiApp::ComparisonManagerMatchedFunctionDiffSymbolTable(const AsmComparis
 
 void ImGuiApp::PrintDiffSymbol(const AsmInstructionPair &instructionPair)
 {
-    // #TODO: Create function to create equal status and use it here and in AsmPrinter.
-
-    constexpr std::string_view equal = "==";
-    constexpr std::string_view unequal = "xx";
-    constexpr std::string_view maybeEqual = "??";
-    constexpr std::string_view leftMissing = ">>";
-    constexpr std::string_view rightMissing = "<<";
-
     // #TODO: Make strictness configurable.
-    const AsmMatchValue matchValue = instructionPair.mismatch_info.get_match_value(AsmMatchStrictness::Lenient);
+    const AsmMatchValueEx matchValue = instructionPair.mismatch_info.get_match_value_ex(AsmMatchStrictness::Lenient);
 
-    switch (matchValue)
-    {
-        case AsmMatchValue::IsMatch:
-            TextUnformattedCenteredX(equal);
-            break;
-
-        case AsmMatchValue::IsMaybeMatch:
-            TextUnformattedCenteredX(maybeEqual);
-            break;
-
-        case AsmMatchValue::IsMismatch: {
-            const AsmInstruction *instruction0 = instructionPair.pair[0];
-            const AsmInstruction *instruction1 = instructionPair.pair[1];
-            if (instruction0 != nullptr && instruction1 != nullptr)
-            {
-                TextUnformattedCenteredX(unequal);
-            }
-            else if (instruction0 == nullptr && instruction1 != nullptr)
-            {
-                TextUnformattedCenteredX(leftMissing);
-            }
-            else if (instruction0 != nullptr && instruction1 == nullptr)
-            {
-                TextUnformattedCenteredX(rightMissing);
-            }
-            else
-            {
-                assert(false);
-            }
-            break;
-        }
-        default:
-            assert(false);
-            break;
-    }
+    TextUnformattedCenteredX(AsmMatchValueStringArray[size_t(matchValue)]);
 }
 
 void ImGuiApp::ComparisonManagerItemListStyleColor(

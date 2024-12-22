@@ -42,6 +42,24 @@ AsmMatchValue AsmMismatchInfo::get_match_value(AsmMatchStrictness strictness) co
     }
 }
 
+AsmMatchValueEx AsmMismatchInfo::get_match_value_ex(AsmMatchStrictness strictness) const
+{
+    const AsmMatchValue matchValue = get_match_value(strictness);
+    if (matchValue == AsmMatchValue::IsMismatch)
+    {
+        if (mismatch_reasons & MismatchReason_MissingLeft)
+            return AsmMatchValueEx::IsMissingLeft;
+        else if (mismatch_reasons & MismatchReason_MissingRight)
+            return AsmMatchValueEx::IsMissingRight;
+        else
+            return AsmMatchValueEx::IsMismatch;
+    }
+    else
+    {
+        return static_cast<AsmMatchValueEx>(matchValue);
+    }
+}
+
 bool AsmMismatchInfo::is_match() const
 {
     return mismatch_bits == 0 && maybe_mismatch_bits == 0 && mismatch_reasons == 0;

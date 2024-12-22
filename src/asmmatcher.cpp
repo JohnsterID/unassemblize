@@ -281,11 +281,10 @@ AsmMatcher::LookaheadResult AsmMatcher::run_lookahead_comparison(
                     assert(std::holds_alternative<AsmInstruction>(variant));
                     const AsmInstruction &instruction = std::get<AsmInstruction>(variant);
                     AsmInstructionPair instruction_pair;
-                    AsmMismatchInfo mismatch_info;
-                    mismatch_info.mismatch_bits = ~uint16_t(0);
                     instruction_pair.pair[lookahead_side] = &instruction;
                     instruction_pair.pair[opposite_side] = nullptr;
-                    instruction_pair.mismatch_info = mismatch_info;
+                    instruction_pair.mismatch_info =
+                        create_mismatch_info(instruction_pair.pair[0], instruction_pair.pair[1]);
                     comparison.records.emplace_back(std::move(instruction_pair));
                     ++comparison.mismatch_count;
                 }
@@ -302,15 +301,28 @@ AsmMismatchInfo AsmMatcher::create_mismatch_info(
     const InstructionTextArray *array0,
     const InstructionTextArray *array1)
 {
+    assert(instruction0 != nullptr || instruction1 != nullptr);
+
     AsmMismatchInfo mismatch_info;
 
-    if (instruction0 == nullptr || instruction1 == nullptr)
+    if (instruction0 == nullptr)
     {
-        mismatch_info.mismatch_reasons |= AsmMismatchInfo::MismatchReason_Missing;
+        mismatch_info.mismatch_reasons |= AsmMismatchInfo::MismatchReason_MissingLeft;
+    }
+    else if (instruction1 == nullptr)
+    {
+        mismatch_info.mismatch_reasons |= AsmMismatchInfo::MismatchReason_MissingRight;
     }
     else if (instruction0->isInvalid != instruction1->isInvalid)
     {
-        mismatch_info.mismatch_reasons |= AsmMismatchInfo::MismatchReason_Invalid;
+        if (instruction0->isInvalid)
+        {
+            mismatch_info.mismatch_reasons |= AsmMismatchInfo::MismatchReason_InvalidLeft;
+        }
+        else if (instruction1->isInvalid)
+        {
+            mismatch_info.mismatch_reasons |= AsmMismatchInfo::MismatchReason_InvalidRight;
+        }
     }
     else
     {

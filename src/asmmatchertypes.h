@@ -31,20 +31,47 @@ enum class AsmMatchValue
 {
     IsMatch,
     IsMaybeMatch,
-    IsMaybeMismatch = IsMaybeMatch,
+    IsMaybeMismatch = IsMaybeMatch, // Opposite wording, but same meaning.
     IsMismatch,
 };
 
+// Extended match value. Same as the other, but with two more states after mismatch.
+enum class AsmMatchValueEx
+{
+    IsMatch = AsmMatchValue::IsMatch,
+    IsMaybeMatch = AsmMatchValue::IsMaybeMatch,
+    IsMaybeMismatch = AsmMatchValue::IsMaybeMismatch, // Opposite wording, but same meaning.
+    IsMismatch = AsmMatchValue::IsMismatch,
+    IsMissingLeft,
+    IsMissingRight,
+
+    Count
+};
+
+inline constexpr std::array<std::string_view, size_t(AsmMatchValueEx::Count)> AsmMatchValueStringArray =
+    {"==", "??", "xx", "<<", ">>"};
+static_assert(size_t(AsmMatchValueEx::Count) == 5, "Adjust array if this length has changed.");
+static_assert(AsmMatchValueStringArray[0].size() == AsmMatchValueStringArray[1].size(), "Expects same length");
+static_assert(AsmMatchValueStringArray[0].size() == AsmMatchValueStringArray[2].size(), "Expects same length");
+static_assert(AsmMatchValueStringArray[0].size() == AsmMatchValueStringArray[3].size(), "Expects same length");
+static_assert(AsmMatchValueStringArray[0].size() == AsmMatchValueStringArray[4].size(), "Expects same length");
+
 struct AsmMismatchInfo
 {
-    enum MismatchReason : uint16_t
+    using MismatchReason = uint16_t;
+    enum MismatchReason_ : MismatchReason
     {
-        MismatchReason_Missing = 1 << 0, // Instruction is missing on one side.
-        MismatchReason_Invalid = 1 << 1, // Instruction is invalid on one side.
-        MismatchReason_JumpLen = 1 << 2, // Jump length is different.
+        MismatchReason_JumpLen = 1 << 0, // Jump length is different.
+        MismatchReason_MissingLeft = 1 << 1, // Instruction is missing on the left side.
+        MismatchReason_MissingRight = 1 << 2, // Instruction is missing on the right side.
+        MismatchReason_Missing = MismatchReason_MissingLeft | MismatchReason_MissingRight,
+        MismatchReason_InvalidLeft = 1 << 3, // Instruction is invalid on the left side.
+        MismatchReason_InvalidRight = 1 << 4, // Instruction is invalid on the right side.
+        MismatchReason_Invalid = MismatchReason_InvalidLeft | MismatchReason_InvalidRight,
     };
 
     AsmMatchValue get_match_value(AsmMatchStrictness strictness) const;
+    AsmMatchValueEx get_match_value_ex(AsmMatchStrictness strictness) const;
 
     bool is_match() const;
     bool is_mismatch() const;
@@ -54,7 +81,7 @@ struct AsmMismatchInfo
 
     uint16_t mismatch_bits = 0; // Bits representing positions where instructions are mismatching.
     uint16_t maybe_mismatch_bits = 0; // Bits representing positions where instructions are maybe mismatching.
-    uint16_t mismatch_reasons = 0;
+    MismatchReason mismatch_reasons = 0;
 };
 static_assert(sizeof(AsmMismatchInfo) <= 8);
 
