@@ -78,6 +78,41 @@ class ImGuiApp
 
     using ProgramFileDescriptorPair = std::array<ProgramFileDescriptor *, 2>;
 
+    enum Side : uint8_t
+    {
+        LeftSide = 0,
+        RightSide = 1,
+    };
+
+    enum class AssemblerTableColumn : uint8_t
+    {
+        SourceLine,
+        SourceCode,
+        Bytes,
+        Address,
+        Assembler,
+    };
+
+    // Class to help draw the assembler table columns. The default column order is different on left and right panes.
+    class AssemblerTableColumnsDrawer
+    {
+    public:
+        AssemblerTableColumnsDrawer(const TextFileContent *fileContent, std::string &textBuffer);
+
+        static void SetupColumns(const std::vector<AssemblerTableColumn> &columns);
+        void PrintAsmInstructionColumns(const std::vector<AssemblerTableColumn> &columns, const AsmInstruction &instruction);
+        static void PrintAsmLabelColumns(const std::vector<AssemblerTableColumn> &columns, const AsmLabel &label);
+
+    private:
+        static void SetupColumn(AssemblerTableColumn column);
+        void PrintAsmInstructionColumn(AssemblerTableColumn column, const AsmInstruction &instruction);
+        static void PrintAsmLabelColumn(AssemblerTableColumn column, const AsmLabel &label);
+
+    private:
+        const TextFileContent *m_fileContent;
+        std::string &m_textBuffer;
+    };
+
 public:
     ImGuiApp();
     ~ImGuiApp();
@@ -253,34 +288,24 @@ private:
         const ProgramComparisonDescriptor &descriptor,
         const MatchedFunction &matchedFunction);
     static void ComparisonManagerMatchedFunctionContentTable(
-        IndexT sideIdx,
+        Side side,
         const AsmComparisonRecords &records,
         const ProgramFileRevisionDescriptor &fileRevision,
         const NamedFunction &namedFunction);
 
     static void ComparisonManagerNamedFunctions(
         const ProgramComparisonDescriptor &descriptor,
-        IndexT sideIdx,
+        Side side,
         span<const IndexT> namedFunctionIndices);
     static void ComparisonManagerNamedFunction(
-        IndexT sideIdx,
+        Side side,
         const ProgramFileRevisionDescriptor &fileRevision,
         const NamedFunction &namedFunction);
     static void ComparisonManagerNamedFunctionContentTable(
-        IndexT sideIdx,
+        Side side,
         const ProgramFileRevisionDescriptor &fileRevision,
         const NamedFunction &namedFunction);
 
-    static void PrintAsmInstructionColumnsLeft(
-        std::string &buf,
-        const AsmInstruction &instruction,
-        const TextFileContent *fileContent);
-    static void PrintAsmInstructionColumnsRight(
-        std::string &buf,
-        const AsmInstruction &instruction,
-        const TextFileContent *fileContent);
-    static void PrintAsmLabelColumnsLeft(const AsmLabel &label, bool showSourceCodeColumns);
-    static void PrintAsmLabelColumnsRight(const AsmLabel &label, bool showSourceCodeColumns);
     static bool PrintAsmInstructionSourceLine(const AsmInstruction &instruction, const TextFileContent &fileContent);
     static bool PrintAsmInstructionSourceCode(const AsmInstruction &instruction, const TextFileContent &fileContent);
     static bool PrintAsmInstructionBytes(std::string &buf, const AsmInstruction &instruction);
@@ -307,6 +332,8 @@ private:
     static bool TreeNodeHeader(const char *str_id, ImGuiTreeNodeFlags flags, const char *fmt, ...) IM_FMTARGS(3);
     static void TreeNodeHeaderStyleColor(ScopedStyleColor &styleColor);
 
+    static const std::vector<AssemblerTableColumn> &GetAssemblerTableColumns(Side side, bool showSourceCodeColumns);
+
 private:
     ImVec2 m_windowPos = ImVec2(0, 0);
     ImVec2 m_windowSize = ImVec2(0, 0);
@@ -329,6 +356,13 @@ private:
 
     std::vector<ProgramFileDescriptorPtr> m_programFiles;
     std::vector<ProgramComparisonDescriptorPtr> m_programComparisons;
+
+    static std::string s_textBuffer1024;
+
+    static const std::vector<AssemblerTableColumn> s_assemblerTableColumnsLeft;
+    static const std::vector<AssemblerTableColumn> s_assemblerTableColumnsRight;
+    static const std::vector<AssemblerTableColumn> s_assemblerTableColumnsLeft_NoSource;
+    static const std::vector<AssemblerTableColumn> s_assemblerTableColumnsRight_NoSource;
 };
 
 } // namespace unassemblize::gui

@@ -22,8 +22,142 @@
 
 namespace unassemblize::gui
 {
+ImGuiApp::AssemblerTableColumnsDrawer::AssemblerTableColumnsDrawer(
+    const TextFileContent *fileContent,
+    std::string &textBuffer) :
+    m_fileContent(fileContent), m_textBuffer(textBuffer)
+{
+}
+
+void ImGuiApp::AssemblerTableColumnsDrawer::SetupColumns(const std::vector<AssemblerTableColumn> &columns)
+{
+    for (AssemblerTableColumn column : columns)
+    {
+        SetupColumn(column);
+    }
+}
+
+void ImGuiApp::AssemblerTableColumnsDrawer::PrintAsmInstructionColumns(
+    const std::vector<AssemblerTableColumn> &columns,
+    const AsmInstruction &instruction)
+{
+    for (AssemblerTableColumn column : columns)
+    {
+        ImGui::TableNextColumn();
+        PrintAsmInstructionColumn(column, instruction);
+    }
+}
+
+void ImGuiApp::AssemblerTableColumnsDrawer::PrintAsmLabelColumns(
+    const std::vector<AssemblerTableColumn> &columns,
+    const AsmLabel &label)
+{
+    for (AssemblerTableColumn column : columns)
+    {
+        ImGui::TableNextColumn();
+        PrintAsmLabelColumn(column, label);
+    }
+}
+
+void ImGuiApp::AssemblerTableColumnsDrawer::SetupColumn(AssemblerTableColumn column)
+{
+    switch (column)
+    {
+        case AssemblerTableColumn::SourceLine:
+            ImGui::TableSetupColumn("Line");
+            break;
+        case AssemblerTableColumn::SourceCode:
+            ImGui::TableSetupColumn("Source Code");
+            break;
+        case AssemblerTableColumn::Bytes:
+            ImGui::TableSetupColumn("Bytes");
+            break;
+        case AssemblerTableColumn::Address:
+            ImGui::TableSetupColumn("Address");
+            break;
+        case AssemblerTableColumn::Assembler:
+            ImGui::TableSetupColumn("Assembler");
+            break;
+    }
+}
+
+void ImGuiApp::AssemblerTableColumnsDrawer::PrintAsmInstructionColumn(
+    AssemblerTableColumn column,
+    const AsmInstruction &instruction)
+{
+    // Note: Must always print a character in a row to satisfy the ImGui clipper.
+
+    switch (column)
+    {
+        case AssemblerTableColumn::SourceLine:
+            assert(m_fileContent != nullptr);
+            if (!ImGuiApp::PrintAsmInstructionSourceLine(instruction, *m_fileContent))
+                TextUnformatted(" ");
+            break;
+        case AssemblerTableColumn::SourceCode:
+            assert(m_fileContent != nullptr);
+            if (!ImGuiApp::PrintAsmInstructionSourceCode(instruction, *m_fileContent))
+                TextUnformatted(" ");
+            break;
+        case AssemblerTableColumn::Bytes:
+            if (!ImGuiApp::PrintAsmInstructionBytes(m_textBuffer, instruction))
+                TextUnformatted(" ");
+            break;
+        case AssemblerTableColumn::Address:
+            ImGuiApp::PrintAsmInstructionAddress(instruction);
+            break;
+        case AssemblerTableColumn::Assembler:
+            if (!ImGuiApp::PrintAsmInstructionAssembler(m_textBuffer, instruction))
+                TextUnformatted(" ");
+            break;
+    }
+}
+
+void ImGuiApp::AssemblerTableColumnsDrawer::PrintAsmLabelColumn(AssemblerTableColumn column, const AsmLabel &label)
+{
+    // Note: Must always print a character in a row to satisfy the ImGui clipper.
+
+    switch (column)
+    {
+        default:
+            TextUnformatted(" ");
+            break;
+        case AssemblerTableColumn::Assembler:
+            ImGuiApp::PrintAsmLabel(label);
+            break;
+    }
+}
+
+std::string ImGuiApp::s_textBuffer1024;
+
+const std::vector<ImGuiApp::AssemblerTableColumn> ImGuiApp::s_assemblerTableColumnsLeft = {
+    AssemblerTableColumn::SourceLine,
+    AssemblerTableColumn::SourceCode,
+    AssemblerTableColumn::Bytes,
+    AssemblerTableColumn::Address,
+    AssemblerTableColumn::Assembler};
+
+const std::vector<ImGuiApp::AssemblerTableColumn> ImGuiApp::s_assemblerTableColumnsRight = {
+    AssemblerTableColumn::Address,
+    AssemblerTableColumn::Assembler,
+    AssemblerTableColumn::Bytes,
+    AssemblerTableColumn::SourceLine,
+    AssemblerTableColumn::SourceCode};
+
+const std::vector<ImGuiApp::AssemblerTableColumn> ImGuiApp::s_assemblerTableColumnsLeft_NoSource = {
+    AssemblerTableColumn::Bytes,
+    AssemblerTableColumn::Address,
+    AssemblerTableColumn::Assembler};
+
+const std::vector<ImGuiApp::AssemblerTableColumn> ImGuiApp::s_assemblerTableColumnsRight_NoSource = {
+    AssemblerTableColumn::Address,
+    AssemblerTableColumn::Assembler,
+    AssemblerTableColumn::Bytes,
+};
+
 ImGuiApp::ImGuiApp()
 {
+    s_textBuffer1024.reserve(1024);
 }
 
 ImGuiApp::~ImGuiApp()
@@ -2581,7 +2715,7 @@ void ImGuiApp::ComparisonManagerFunctionEntries(ProgramComparisonDescriptor &des
 
         for (IndexT i = 0; i < 2; ++i)
         {
-            ComparisonManagerNamedFunctions(descriptor, i, pageData.namedFunctionIndicesArray[i]);
+            ComparisonManagerNamedFunctions(descriptor, Side(i), pageData.namedFunctionIndicesArray[i]);
         }
     }
 }
@@ -2686,8 +2820,8 @@ void ImGuiApp::ComparisonManagerMatchedFunction(
             {
                 ImGui::TableNextColumn();
 
-                const IndexT side = 0;
-                ImScoped::ID id(static_cast<int>(side));
+                const Side side = Side::LeftSide;
+                ImScoped::ID id(side);
 
                 const ProgramFileRevisionDescriptor &revision = *descriptor.m_files[side].m_revisionDescriptor;
                 const IndexT namedFunctionIndex = matchedFunction.named_idx_pair[side];
@@ -2704,8 +2838,8 @@ void ImGuiApp::ComparisonManagerMatchedFunction(
             {
                 ImGui::TableNextColumn();
 
-                const IndexT side = 1;
-                ImScoped::ID id(static_cast<int>(side));
+                const Side side = Side::RightSide;
+                ImScoped::ID id(side);
 
                 const ProgramFileRevisionDescriptor &revision = *descriptor.m_files[side].m_revisionDescriptor;
                 const IndexT namedFunctionIndex = matchedFunction.named_idx_pair[side];
@@ -2717,56 +2851,27 @@ void ImGuiApp::ComparisonManagerMatchedFunction(
 }
 
 void ImGuiApp::ComparisonManagerMatchedFunctionContentTable(
-    IndexT sideIdx,
+    Side side,
     const AsmComparisonRecords &records,
     const ProgramFileRevisionDescriptor &fileRevision,
     const NamedFunction &namedFunction)
 {
-    assert(sideIdx < 2);
-
     const std::string &sourceFile = namedFunction.function.get_source_file_name();
     const TextFileContent *fileContent = fileRevision.m_fileContentStorage.find_content(sourceFile);
     const bool showSourceCodeColumns = fileContent != nullptr;
-    int columnCount = 5;
-    if (!showSourceCodeColumns)
-        columnCount -= 2;
+    const std::vector<AssemblerTableColumn> &assemblerTableColumns = GetAssemblerTableColumns(side, showSourceCodeColumns);
+    AssemblerTableColumnsDrawer columnsDrawer(fileContent, s_textBuffer1024);
 
     const ImVec2 tableSize(0.0f, GetMaxTableHeight(records.size()));
-    ImScoped::Table table("##function_assembler_table", columnCount, AssemblerTableFlags, tableSize);
+    ImScoped::Table table("##function_assembler_table", assemblerTableColumns.size(), AssemblerTableFlags, tableSize);
     if (table.IsContentVisible)
     {
-        std::string buf;
-        buf.reserve(1024);
-        const bool leftSide = sideIdx == 0;
-        const auto PrintAsmInstructionColumns = leftSide ? PrintAsmInstructionColumnsLeft : PrintAsmInstructionColumnsRight;
-        const auto PrintAsmLabelColumns = leftSide ? PrintAsmLabelColumnsLeft : PrintAsmLabelColumnsRight;
-
         // #TODO: Implement coloring for matches and mismatches.
         // #TODO: Add feature to auto hide columns by default.
         // #TODO: Add feature to change default or current width of columns.
-        // #TODO: Simplify this. Put in a struct maybe. Have array of elements that can be ordered.
-        if (leftSide)
-        {
-            if (showSourceCodeColumns)
-            {
-                ImGui::TableSetupColumn("Line");
-                ImGui::TableSetupColumn("Source Code");
-            }
-            ImGui::TableSetupColumn("Bytes");
-            ImGui::TableSetupColumn("Address");
-            ImGui::TableSetupColumn("Assembler");
-        }
-        else
-        {
-            ImGui::TableSetupColumn("Address");
-            ImGui::TableSetupColumn("Assembler");
-            ImGui::TableSetupColumn("Bytes");
-            if (showSourceCodeColumns)
-            {
-                ImGui::TableSetupColumn("Line");
-                ImGui::TableSetupColumn("Source Code");
-            }
-        }
+
+        columnsDrawer.SetupColumns(assemblerTableColumns);
+
         ImGui::TableHeadersRow();
 
         ImGuiListClipper clipper;
@@ -2781,23 +2886,23 @@ void ImGuiApp::ComparisonManagerMatchedFunctionContentTable(
                 const AsmComparisonRecord &record = records[n];
                 if (const AsmInstructionPair *instructionPair = std::get_if<AsmInstructionPair>(&record))
                 {
-                    if (const AsmInstruction *instruction = instructionPair->pair[sideIdx])
+                    if (const AsmInstruction *instruction = instructionPair->pair[side])
                     {
-                        PrintAsmInstructionColumns(buf, *instruction, fileContent);
+                        columnsDrawer.PrintAsmInstructionColumns(assemblerTableColumns, *instruction);
                         continue;
                     }
                 }
                 else if (const AsmLabelPair *labelPair = std::get_if<AsmLabelPair>(&record))
                 {
-                    if (const AsmLabel *label = labelPair->pair[sideIdx])
+                    if (const AsmLabel *label = labelPair->pair[side])
                     {
-                        PrintAsmLabelColumns(*label, showSourceCodeColumns);
+                        columnsDrawer.PrintAsmLabelColumns(assemblerTableColumns, *label);
                         continue;
                     }
                 }
 
                 // Add empty columns with dummy texts to satisfy the clipper.
-                for (int i = 0; i < columnCount; ++i)
+                for (size_t i = 0; i < assemblerTableColumns.size(); ++i)
                 {
                     ImGui::TableNextColumn();
                     TextUnformatted(" ");
@@ -2809,11 +2914,11 @@ void ImGuiApp::ComparisonManagerMatchedFunctionContentTable(
 
 void ImGuiApp::ComparisonManagerNamedFunctions(
     const ProgramComparisonDescriptor &descriptor,
-    IndexT sideIdx,
+    Side side,
     span<const IndexT> namedFunctionIndices)
 {
     using File = ProgramComparisonDescriptor::File;
-    const File &file = descriptor.m_files[sideIdx];
+    const File &file = descriptor.m_files[side];
 
     for (IndexT namedFunctionIndex : namedFunctionIndices)
     {
@@ -2831,17 +2936,16 @@ void ImGuiApp::ComparisonManagerNamedFunctions(
 
         if (tree.IsOpen)
         {
-            ComparisonManagerNamedFunction(sideIdx, revision, namedFunction);
+            ComparisonManagerNamedFunction(side, revision, namedFunction);
         }
     }
 }
 
 void ImGuiApp::ComparisonManagerNamedFunction(
-    IndexT sideIdx,
+    Side side,
     const ProgramFileRevisionDescriptor &fileRevision,
     const NamedFunction &namedFunction)
 {
-    assert(sideIdx < 2);
     assert(namedFunction.is_disassembled());
 
     const AsmInstructionVariants &records = namedFunction.function.get_instructions();
@@ -2877,16 +2981,14 @@ void ImGuiApp::ComparisonManagerNamedFunction(
             ImGui::TableSetupColumn("##column2", ImGuiTableColumnFlags_WidthStretch, 50.0f);
             ImGui::TableNextRow();
 
-            const bool leftSide = sideIdx == 0;
-
-            ImGui::TableSetColumnIndex(leftSide ? 0 : 2);
-            ComparisonManagerNamedFunctionContentTable(sideIdx, fileRevision, namedFunction);
+            ImGui::TableSetColumnIndex(side == Side::LeftSide ? 0 : 2);
+            ComparisonManagerNamedFunctionContentTable(side, fileRevision, namedFunction);
         }
     }
 }
 
 void ImGuiApp::ComparisonManagerNamedFunctionContentTable(
-    IndexT sideIdx,
+    Side side,
     const ProgramFileRevisionDescriptor &fileRevision,
     const NamedFunction &namedFunction)
 {
@@ -2894,44 +2996,20 @@ void ImGuiApp::ComparisonManagerNamedFunctionContentTable(
     const std::string &sourceFile = namedFunction.function.get_source_file_name();
     const TextFileContent *fileContent = fileRevision.m_fileContentStorage.find_content(sourceFile);
     const bool showSourceCodeColumns = fileContent != nullptr;
-    int columnCount = 5;
-    if (!showSourceCodeColumns)
-        columnCount -= 2;
+    const std::vector<AssemblerTableColumn> &assemblerTableColumns = GetAssemblerTableColumns(side, showSourceCodeColumns);
+    AssemblerTableColumnsDrawer columnsDrawer(fileContent, s_textBuffer1024);
 
-    ImScoped::Table table("##function_assembler_table", columnCount, AssemblerTableFlags | ImGuiTableFlags_ScrollY);
+    ImScoped::Table table(
+        "##function_assembler_table",
+        assemblerTableColumns.size(),
+        AssemblerTableFlags | ImGuiTableFlags_ScrollY);
+
     if (table.IsContentVisible)
     {
-        std::string buf;
-        buf.reserve(1024);
-        const bool leftSide = sideIdx == 0;
-        const auto PrintAsmInstructionColumns = leftSide ? PrintAsmInstructionColumnsLeft : PrintAsmInstructionColumnsRight;
-        const auto PrintAsmLabelColumns = leftSide ? PrintAsmLabelColumnsLeft : PrintAsmLabelColumnsRight;
-
         ImGui::TableSetupScrollFreeze(0, 1); // Makes top row always visible.
 
-        // #TODO: Simplify this. Put in a struct maybe. Have array of elements that can be ordered.
-        if (leftSide)
-        {
-            if (showSourceCodeColumns)
-            {
-                ImGui::TableSetupColumn("Line");
-                ImGui::TableSetupColumn("Source Code");
-            }
-            ImGui::TableSetupColumn("Bytes");
-            ImGui::TableSetupColumn("Address");
-            ImGui::TableSetupColumn("Assembler");
-        }
-        else
-        {
-            ImGui::TableSetupColumn("Address");
-            ImGui::TableSetupColumn("Assembler");
-            ImGui::TableSetupColumn("Bytes");
-            if (showSourceCodeColumns)
-            {
-                ImGui::TableSetupColumn("Line");
-                ImGui::TableSetupColumn("Source Code");
-            }
-        }
+        columnsDrawer.SetupColumns(assemblerTableColumns);
+
         ImGui::TableHeadersRow();
 
         ImGuiListClipper clipper;
@@ -2946,126 +3024,18 @@ void ImGuiApp::ComparisonManagerNamedFunctionContentTable(
                 const AsmInstructionVariant &record = records[n];
                 if (const AsmInstruction *instruction = std::get_if<AsmInstruction>(&record))
                 {
-                    PrintAsmInstructionColumns(buf, *instruction, fileContent);
+                    columnsDrawer.PrintAsmInstructionColumns(assemblerTableColumns, *instruction);
                 }
                 else if (const AsmLabel *label = std::get_if<AsmLabel>(&record))
                 {
-                    PrintAsmLabelColumns(*label, showSourceCodeColumns);
+                    columnsDrawer.PrintAsmLabelColumns(assemblerTableColumns, *label);
                 }
                 else
                 {
-                    // Add empty columns with dummy texts to satisfy the clipper.
-                    for (int i = 0; i < columnCount; ++i)
-                    {
-                        ImGui::TableNextColumn();
-                        TextUnformatted(" ");
-                    }
+                    assert(false);
                 }
             }
         }
-    }
-}
-
-void ImGuiApp::PrintAsmInstructionColumnsLeft(
-    std::string &buf,
-    const AsmInstruction &instruction,
-    const TextFileContent *fileContent)
-{
-    // Always print a character to satisfy the clipper.
-
-    const bool showSourceCodeColumns = fileContent != nullptr;
-
-    if (showSourceCodeColumns)
-    {
-        ImGui::TableNextColumn(); // Source Line
-        if (!PrintAsmInstructionSourceLine(instruction, *fileContent))
-            TextUnformatted(" ");
-
-        ImGui::TableNextColumn(); // Source Code
-        if (!PrintAsmInstructionSourceCode(instruction, *fileContent))
-            TextUnformatted(" ");
-    }
-
-    ImGui::TableNextColumn(); // Bytes
-    if (!PrintAsmInstructionBytes(buf, instruction))
-        TextUnformatted(" ");
-
-    ImGui::TableNextColumn(); // Address
-    PrintAsmInstructionAddress(instruction);
-
-    ImGui::TableNextColumn(); // Assembler
-    if (!PrintAsmInstructionAssembler(buf, instruction))
-        TextUnformatted(" ");
-}
-
-void ImGuiApp::PrintAsmInstructionColumnsRight(
-    std::string &buf,
-    const AsmInstruction &instruction,
-    const TextFileContent *fileContent)
-{
-    // Always print a character to satisfy the clipper.
-
-    const bool showSourceCodeColumns = fileContent != nullptr;
-
-    ImGui::TableNextColumn(); // Address
-    PrintAsmInstructionAddress(instruction);
-
-    ImGui::TableNextColumn(); // Assembler
-    if (!PrintAsmInstructionAssembler(buf, instruction))
-        TextUnformatted(" ");
-
-    ImGui::TableNextColumn(); // Bytes
-    if (!PrintAsmInstructionBytes(buf, instruction))
-        TextUnformatted(" ");
-
-    if (showSourceCodeColumns)
-    {
-        ImGui::TableNextColumn(); // Source Line
-        if (!PrintAsmInstructionSourceLine(instruction, *fileContent))
-            TextUnformatted(" ");
-
-        ImGui::TableNextColumn(); // Source Code
-        if (!PrintAsmInstructionSourceCode(instruction, *fileContent))
-            TextUnformatted(" ");
-    }
-}
-
-void ImGuiApp::PrintAsmLabelColumnsLeft(const AsmLabel &label, bool showSourceCodeColumns)
-{
-    // Always print a character to satisfy the clipper.
-
-    if (showSourceCodeColumns)
-    {
-        ImGui::TableNextColumn(); // Source Line
-        TextUnformatted(" ");
-        ImGui::TableNextColumn(); // Source Code
-        TextUnformatted(" ");
-    }
-    ImGui::TableNextColumn(); // Bytes
-    TextUnformatted(" ");
-    ImGui::TableNextColumn(); // Address
-    TextUnformatted(" ");
-    ImGui::TableNextColumn(); // Assembler
-    PrintAsmLabel(label);
-}
-
-void ImGuiApp::PrintAsmLabelColumnsRight(const AsmLabel &label, bool showSourceCodeColumns)
-{
-    // Always print a character to satisfy the clipper.
-
-    ImGui::TableNextColumn(); // Address
-    TextUnformatted(" ");
-    ImGui::TableNextColumn(); // Assembler
-    PrintAsmLabel(label);
-    ImGui::TableNextColumn(); // Bytes
-    TextUnformatted(" ");
-
-    if (showSourceCodeColumns)
-    {
-        ImGui::TableNextColumn(); // Source Line
-        TextUnformatted(" ");
-        ImGui::TableNextColumn(); // Source Code
-        TextUnformatted(" ");
     }
 }
 
@@ -3305,6 +3275,24 @@ void ImGuiApp::TreeNodeHeaderStyleColor(ScopedStyleColor &styleColor)
     styleColor.Push(ImGuiCol_Header, IM_COL32(0xDB, 0x61, 0x40, 150));
     styleColor.Push(ImGuiCol_HeaderHovered, IM_COL32(0xDB, 0x61, 0x40, 204));
     styleColor.Push(ImGuiCol_HeaderActive, IM_COL32(0xDB, 0x61, 0x40, 255));
+}
+
+const std::vector<ImGuiApp::AssemblerTableColumn> &ImGuiApp::GetAssemblerTableColumns(Side side, bool showSourceCodeColumns)
+{
+    switch (side)
+    {
+        default:
+        case Side::LeftSide:
+            if (showSourceCodeColumns)
+                return s_assemblerTableColumnsLeft;
+            else
+                return s_assemblerTableColumnsLeft_NoSource;
+        case Side::RightSide:
+            if (showSourceCodeColumns)
+                return s_assemblerTableColumnsRight;
+            else
+                return s_assemblerTableColumnsRight_NoSource;
+    }
 }
 
 } // namespace unassemblize::gui
