@@ -36,17 +36,13 @@ class AsmMatcher
     };
 
 public:
-    /*
-     * Runs a comparison on the given FunctionMatch.
-     * The returned result will retain a dependency on that FunctionMatch object.
-     */
+    // Runs a comparison on the given FunctionMatch.
+    // The returned result will retain a dependency on that FunctionMatch object.
     static AsmComparisonResult run_comparison(ConstFunctionPair function_pair, uint32_t lookahead_limit);
 
 private:
-    /*
-     * Looks ahead one side of the instruction list and compares
-     * its last instruction with the base instruction of the opposite side.
-     */
+    // Looks ahead one side of the instruction list and compares
+    // its last instruction with the base instruction of the opposite side.
     static LookaheadResult run_lookahead_comparison(
         size_t lookahead_side,
         AsmInstructionVariants::const_iterator lookahead_base_it,

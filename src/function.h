@@ -30,9 +30,7 @@ namespace unassemblize
 {
 class Function;
 
-/*
- * Function disassemble setup class. Can be passed to multiple Function instances.
- */
+// Function disassemble setup class. Can be passed to multiple Function instances.
 class FunctionSetup
 {
     friend class Function;
@@ -59,9 +57,7 @@ private:
     ZydisFormatterRegisterFunc m_default_print_register;
 };
 
-/*
- * Data used within function disassemble step. Is cleared at the end of it.
- */
+// Data used within function disassemble step. Is cleared at the end of it.
 class FunctionIntermediate
 {
 public:
@@ -74,9 +70,7 @@ public:
     Address64ToIndexMap m_pseudoSymbolAddressToIndexMap;
 };
 
-/*
- * Function disassemble class.
- */
+// Function disassemble class.
 class Function
 {
     friend class FunctionSetup;
@@ -86,20 +80,14 @@ class Function
 public:
     Function() = default;
 
-    /*
-     * Set address range. Must not be called after disassemble, but can be called before.
-     */
+    // Set address range. Must not be called after disassemble, but can be called before.
     void set_address_range(Address64T begin_address, Address64T end_address);
 
-    /*
-     * Set source file info. Must not be called before disassembler, but can be called after.
-     */
+    // Set source file info. Must not be called before disassembler, but can be called after.
     void set_source_file(const PdbSourceFileInfo &source_file, const PdbSourceLineInfoVector &source_lines);
 
-    /*
-     * Disassemble a function from begin to end with the given setup. The address range is free to choose, but it is best
-     * used for a single function only. When complete, instruction data will be available.
-     */
+    // Disassemble a function from begin to end with the given setup. The address range is free to choose, but it is best
+    // used for a single function only. When complete, instruction data will be available.
     void disassemble(const FunctionSetup &setup, Address64T begin_address, Address64T end_address);
     void disassemble(const FunctionSetup &setup);
 

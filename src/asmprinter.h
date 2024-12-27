@@ -29,14 +29,10 @@ class AsmPrinter
     };
 
 public:
-    /*
-     * Appends texts from instruction data to a string.
-     */
+    // Appends texts from instruction data to a string.
     static void append_to_string(std::string &str, const AsmInstructionVariants &instructions, uint32_t indent_len);
 
-    /*
-     * Appends texts from instruction data of a comparison result to a string.
-     */
+    // Appends texts from instruction data of a comparison result to a string.
     void append_to_string(
         std::string &str,
         const AsmComparisonResult &comparison,

@@ -155,9 +155,7 @@ struct NamedFunctionMatchInfo
 };
 using NamedFunctionMatchInfos = std::vector<NamedFunctionMatchInfo>;
 
-/*
- * Pairs a function from 2 executables that can be matched.
- */
+// Pairs a function from 2 executables that can be matched.
 struct MatchedFunction
 {
     bool is_compared() const;
@@ -184,9 +182,7 @@ enum BuildBundleFlags_ : BuildBundleFlags
     BuildBundleFlagsAll = 255u,
 };
 
-/*
- * Groups function matches of the same compiland or source file together.
- */
+// Groups function matches of the same compiland or source file together.
 struct NamedFunctionBundle
 {
     using Id = uint32_t;

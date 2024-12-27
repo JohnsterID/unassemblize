@@ -56,15 +56,11 @@ public:
     const ExeSymbol *get_symbol_from_image_base(uint64_t address) const; // Adds the image base before symbol lookup.
     const ExeSymbols &get_symbols() const;
 
-    /*
-     * Adds series of new symbols if not already present.
-     */
+    // Adds series of new symbols if not already present.
     void add_symbols(const ExeSymbols &symbols, bool overwrite = false);
     void add_symbols(const PdbSymbolInfoVector &symbols, bool overwrite = false);
 
-    /*
-     * Adds new symbol if not already present.
-     */
+    // Adds new symbol if not already present.
     void add_symbol(const ExeSymbol &symbol, bool overwrite = false);
 
 private:

@@ -39,9 +39,7 @@ enum class AsmFormat
 
 AsmFormat to_asm_format(std::string_view str);
 
-/*
- * Intermediate instruction data between Zydis disassemble and final text generation.
- */
+// Intermediate instruction data between Zydis disassemble and final text generation.
 struct AsmInstruction
 {
     using BytesArray = SizedArray<uint8_t, uint8_t, 11>;
