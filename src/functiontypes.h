@@ -87,4 +87,10 @@ struct AsmNull
 using AsmInstructionVariant = std::variant<AsmLabel, AsmInstruction, AsmNull>;
 using AsmInstructionVariants = std::vector<AsmInstructionVariant>;
 
+using InstructionTextArray = SizedArray<std::string_view, size_t, 4>;
+
+// Splits instruction text string to text array.
+// "mov dword ptr[eax], 0x10" becomes {"mov", "dword ptr[eax]", "0x10"}
+InstructionTextArray split_instruction_text(std::string_view text);
+
 } // namespace unassemblize

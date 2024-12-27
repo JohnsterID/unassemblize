@@ -50,4 +50,46 @@ void AsmInstruction::set_bytes(const uint8_t *p, size_t size)
     bytes.size = uint8_t(max_bytes);
 }
 
+InstructionTextArray split_instruction_text(std::string_view text)
+{
+    InstructionTextArray arr;
+    size_t index = 0;
+    char wordSeperator = ' ';
+    bool in_quote = false;
+    const char *textEnd = text.data() + text.size();
+    const char *wordBegin = text.data();
+    const char *c = text.data();
+
+    while (c != textEnd)
+    {
+        if (*c == '\"')
+        {
+            // Does not look for separator inside quoted text.
+            in_quote = !in_quote;
+        }
+        else if (!in_quote && *c == wordSeperator)
+        {
+            // Lock word.
+            arr.elements[index] = {wordBegin, static_cast<size_t>(c - wordBegin)};
+            // Change word separator for operands.
+            wordSeperator = ',';
+            // Skip separator
+            ++c;
+            // Omit spaces between operands.
+            while (*c == ' ')
+                ++c;
+            // Increment word index.
+            ++index;
+            assert(index < arr.elements.size());
+            // Store new word begin.
+            wordBegin = c;
+            continue;
+        }
+        ++c;
+    }
+    arr.elements[index] = {wordBegin, static_cast<size_t>(c - wordBegin)};
+    arr.size = index + 1;
+    return arr;
+}
+
 } // namespace unassemblize

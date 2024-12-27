@@ -102,7 +102,7 @@ AsmComparisonResult AsmMatcher::run_comparison(ConstFunctionPair function_pair, 
             {
                 // Lookahead if 'mismatch' or 'maybe mismatch'. Perhaps there is a better match ahead.
                 // No lookahead if instruction is missing on one side.
-                do_lookahead = (mismatch_info.mismatch_reasons & AsmMismatchInfo::MismatchReason_Missing) == 0;
+                do_lookahead = (mismatch_info.mismatch_reasons & AsmMismatchReason_Missing) == 0;
             }
 
             if (do_lookahead)
@@ -307,21 +307,21 @@ AsmMismatchInfo AsmMatcher::create_mismatch_info(
 
     if (instruction0 == nullptr)
     {
-        mismatch_info.mismatch_reasons |= AsmMismatchInfo::MismatchReason_MissingLeft;
+        mismatch_info.mismatch_reasons |= AsmMismatchReason_MissingLeft;
     }
     else if (instruction1 == nullptr)
     {
-        mismatch_info.mismatch_reasons |= AsmMismatchInfo::MismatchReason_MissingRight;
+        mismatch_info.mismatch_reasons |= AsmMismatchReason_MissingRight;
     }
     else if (instruction0->isInvalid != instruction1->isInvalid)
     {
         if (instruction0->isInvalid)
         {
-            mismatch_info.mismatch_reasons |= AsmMismatchInfo::MismatchReason_InvalidLeft;
+            mismatch_info.mismatch_reasons |= AsmMismatchReason_InvalidLeft;
         }
         else if (instruction1->isInvalid)
         {
-            mismatch_info.mismatch_reasons |= AsmMismatchInfo::MismatchReason_InvalidRight;
+            mismatch_info.mismatch_reasons |= AsmMismatchReason_InvalidRight;
         }
     }
     else
@@ -337,7 +337,7 @@ AsmMismatchInfo AsmMatcher::create_mismatch_info(
 
         if (has_jump_len_mismatch(*instruction0, *instruction1))
         {
-            mismatch_info.mismatch_reasons |= AsmMismatchInfo::MismatchReason_JumpLen;
+            mismatch_info.mismatch_reasons |= AsmMismatchReason_JumpLen;
         }
     }
 
@@ -515,48 +515,6 @@ AsmMatcher::InstructionTextArrays AsmMatcher::split_instruction_texts(const AsmI
         }
     }
     return arrays;
-}
-
-AsmMatcher::InstructionTextArray AsmMatcher::split_instruction_text(std::string_view text)
-{
-    InstructionTextArray arr;
-    size_t index = 0;
-    char wordSeperator = ' ';
-    bool in_quote = false;
-    const char *textEnd = text.data() + text.size();
-    const char *wordBegin = text.data();
-    const char *c = text.data();
-
-    while (c != textEnd)
-    {
-        if (*c == '\"')
-        {
-            // Does not look for separator inside quoted text.
-            in_quote = !in_quote;
-        }
-        else if (!in_quote && *c == wordSeperator)
-        {
-            // Lock word.
-            arr.elements[index] = {wordBegin, static_cast<size_t>(c - wordBegin)};
-            // Change word separator for operands.
-            wordSeperator = ',';
-            // Skip separator
-            ++c;
-            // Omit spaces between operands.
-            while (*c == ' ')
-                ++c;
-            // Increment word index.
-            ++index;
-            assert(index < arr.elements.size());
-            // Store new word begin.
-            wordBegin = c;
-            continue;
-        }
-        ++c;
-    }
-    arr.elements[index] = {wordBegin, static_cast<size_t>(c - wordBegin)};
-    arr.size = index + 1;
-    return arr;
 }
 
 } // namespace unassemblize

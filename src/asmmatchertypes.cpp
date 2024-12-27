@@ -47,9 +47,9 @@ AsmMatchValueEx AsmMismatchInfo::get_match_value_ex(AsmMatchStrictness strictnes
     const AsmMatchValue matchValue = get_match_value(strictness);
     if (matchValue == AsmMatchValue::IsMismatch)
     {
-        if (mismatch_reasons & MismatchReason_MissingLeft)
+        if (mismatch_reasons & AsmMismatchReason_MissingLeft)
             return AsmMatchValueEx::IsMissingLeft;
-        else if (mismatch_reasons & MismatchReason_MissingRight)
+        else if (mismatch_reasons & AsmMismatchReason_MissingRight)
             return AsmMatchValueEx::IsMissingRight;
         else
             return AsmMatchValueEx::IsMismatch;

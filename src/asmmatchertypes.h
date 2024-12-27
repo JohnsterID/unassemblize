@@ -56,20 +56,20 @@ static_assert(AsmMatchValueStringArray[0].size() == AsmMatchValueStringArray[2].
 static_assert(AsmMatchValueStringArray[0].size() == AsmMatchValueStringArray[3].size(), "Expects same length");
 static_assert(AsmMatchValueStringArray[0].size() == AsmMatchValueStringArray[4].size(), "Expects same length");
 
+using AsmMismatchReason = uint16_t;
+enum AsmMismatchReason_ : AsmMismatchReason
+{
+    AsmMismatchReason_JumpLen = 1 << 0, // Jump length is different.
+    AsmMismatchReason_MissingLeft = 1 << 1, // Instruction is missing on the left side.
+    AsmMismatchReason_MissingRight = 1 << 2, // Instruction is missing on the right side.
+    AsmMismatchReason_Missing = AsmMismatchReason_MissingLeft | AsmMismatchReason_MissingRight,
+    AsmMismatchReason_InvalidLeft = 1 << 3, // Instruction is invalid on the left side.
+    AsmMismatchReason_InvalidRight = 1 << 4, // Instruction is invalid on the right side.
+    AsmMismatchReason_Invalid = AsmMismatchReason_InvalidLeft | AsmMismatchReason_InvalidRight,
+};
+
 struct AsmMismatchInfo
 {
-    using MismatchReason = uint16_t;
-    enum MismatchReason_ : MismatchReason
-    {
-        MismatchReason_JumpLen = 1 << 0, // Jump length is different.
-        MismatchReason_MissingLeft = 1 << 1, // Instruction is missing on the left side.
-        MismatchReason_MissingRight = 1 << 2, // Instruction is missing on the right side.
-        MismatchReason_Missing = MismatchReason_MissingLeft | MismatchReason_MissingRight,
-        MismatchReason_InvalidLeft = 1 << 3, // Instruction is invalid on the left side.
-        MismatchReason_InvalidRight = 1 << 4, // Instruction is invalid on the right side.
-        MismatchReason_Invalid = MismatchReason_InvalidLeft | MismatchReason_InvalidRight,
-    };
-
     AsmMatchValue get_match_value(AsmMatchStrictness strictness) const;
     AsmMatchValueEx get_match_value_ex(AsmMatchStrictness strictness) const;
 
@@ -79,9 +79,9 @@ struct AsmMismatchInfo
     bool is_maybe_match() const;
     bool is_maybe_mismatch() const;
 
-    uint16_t mismatch_bits = 0; // Bits representing positions where instructions are mismatching.
-    uint16_t maybe_mismatch_bits = 0; // Bits representing positions where instructions are maybe mismatching.
-    MismatchReason mismatch_reasons = 0;
+    uint16_t mismatch_bits = 0; // Bit positions where instructions are mismatching. Mutually exclusive.
+    uint16_t maybe_mismatch_bits = 0; // Bit positions where instructions are maybe mismatching. Mutually exclusive.
+    AsmMismatchReason mismatch_reasons = 0;
 };
 static_assert(sizeof(AsmMismatchInfo) <= 8);
 

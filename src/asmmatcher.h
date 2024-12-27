@@ -18,8 +18,6 @@ namespace unassemblize
 {
 class AsmMatcher
 {
-    using InstructionTextArray = SizedArray<std::string_view, size_t, 4>; // #TODO: Move to asmmatchertypes.h?
-
     using InstructionTextArrays = std::vector<InstructionTextArray>;
 
     struct LookaheadResult
@@ -71,12 +69,7 @@ private:
     static SkipSymbolResult skip_unknown_symbol(const char *str);
     static const char *skip_known_symbol(const char *str);
 
-    /*
-     * Splits instruction text string to text array.
-     * "mov dword ptr[eax], 0x10" becomes {"mov", "dword ptr[eax]", "0x10"}
-     */
     static InstructionTextArrays split_instruction_texts(const AsmInstructionVariants &instructions);
-    static InstructionTextArray split_instruction_text(std::string_view text);
 
     static AsmInstructionVariant s_nullInstructionVariant;
 };
