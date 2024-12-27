@@ -72,7 +72,11 @@ class ImGuiApp
     static constexpr BuildBundleFlags GuiBuildSingleBundleFlags = GuiBuildBundleFlags | BuildUnmatchedNamedFunctionIndices;
     static constexpr ImU32 RedColor = IM_COL32(255, 0, 0, 255);
     static constexpr ImU32 GreenColor = IM_COL32(0, 255, 0, 255);
+    static constexpr ImU32 YellowColor = IM_COL32(255, 255, 0, 255);
+    static constexpr ImU32 BluePinkColor = IM_COL32(160, 0, 255, 255);
     static constexpr ImU32 LightGrayColor = IM_COL32(0xA0, 0xA0, 0xA0, 0xFF);
+    static constexpr ImU32 MismatchBgColor = CreateColor(RedColor, 96);
+    static constexpr ImU32 MaybeMismatchBgColor = CreateColor(YellowColor, 96);
     static constexpr ImVec2 StandardMinButtonSize = ImVec2(80, 0);
     static constexpr std::chrono::system_clock::time_point InvalidTimePoint = std::chrono::system_clock::time_point::min();
 
@@ -97,20 +101,25 @@ class ImGuiApp
     class AssemblerTableColumnsDrawer
     {
     public:
-        AssemblerTableColumnsDrawer(const TextFileContent *fileContent, std::string &textBuffer);
+        explicit AssemblerTableColumnsDrawer(const TextFileContent *fileContent);
 
         static void SetupColumns(const std::vector<AssemblerTableColumn> &columns);
-        void PrintAsmInstructionColumns(const std::vector<AssemblerTableColumn> &columns, const AsmInstruction &instruction);
+        void PrintAsmInstructionColumns(
+            const std::vector<AssemblerTableColumn> &columns,
+            const AsmInstruction &instruction,
+            const AsmMismatchInfo &mismatchInfo = {});
         static void PrintAsmLabelColumns(const std::vector<AssemblerTableColumn> &columns, const AsmLabel &label);
 
     private:
         static void SetupColumn(AssemblerTableColumn column);
-        void PrintAsmInstructionColumn(AssemblerTableColumn column, const AsmInstruction &instruction);
+        void PrintAsmInstructionColumn(
+            AssemblerTableColumn column,
+            const AsmInstruction &instruction,
+            const AsmMismatchInfo &mismatchInfo);
         static void PrintAsmLabelColumn(AssemblerTableColumn column, const AsmLabel &label);
 
     private:
         const TextFileContent *m_fileContent;
-        std::string &m_textBuffer;
     };
 
 public:
@@ -308,13 +317,12 @@ private:
 
     static bool PrintAsmInstructionSourceLine(const AsmInstruction &instruction, const TextFileContent &fileContent);
     static bool PrintAsmInstructionSourceCode(const AsmInstruction &instruction, const TextFileContent &fileContent);
-    static bool PrintAsmInstructionBytes(std::string &buf, const AsmInstruction &instruction);
+    static void PrintAsmInstructionBytes(const AsmInstruction &instruction);
     static void PrintAsmInstructionAddress(const AsmInstruction &instruction);
-    static bool PrintAsmInstructionAssembler(std::string &buf, const AsmInstruction &instruction);
+    static void PrintAsmInstructionAssembler(const AsmInstruction &instruction, const AsmMismatchInfo &mismatchInfo);
     static void PrintAsmLabel(const AsmLabel &label);
 
     static void ComparisonManagerMatchedFunctionDiffSymbolTable(const AsmComparisonRecords &records);
-    static void PrintDiffSymbol(const AsmInstructionPair &instructionPair);
 
     static void ComparisonManagerItemListStyleColor(
         ScopedStyleColor &styleColor,
@@ -333,6 +341,9 @@ private:
     static void TreeNodeHeaderStyleColor(ScopedStyleColor &styleColor);
 
     static const std::vector<AssemblerTableColumn> &GetAssemblerTableColumns(Side side, bool showSourceCodeColumns);
+
+    static ImU32 GetAsmMatchValueColor(AsmMatchValueEx matchValue);
+    static ImU32 GetMismatchBitColor(const AsmMismatchInfo &mismatchInfo, int bit);
 
 private:
     ImVec2 m_windowPos = ImVec2(0, 0);

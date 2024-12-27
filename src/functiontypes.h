@@ -72,7 +72,7 @@ struct AsmInstruction
         int16_t jumpLen; // Jump length in bytes.
     };
     uint16_t lineNumber; // Line number in the source file - if exists.
-    std::string text; // Instruction mnemonics and operands with address symbol substitution.
+    std::string text; // Instruction mnemonics and operands with address symbol substitution. Is not expected empty if valid.
 };
 
 struct AsmLabel

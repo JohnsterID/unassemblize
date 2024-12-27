@@ -47,6 +47,11 @@ void ScopedStyleColor::PopAll()
     }
 }
 
+ImVec2 CalcTextSize(std::string_view view, bool hide_text_after_double_hash, float wrap_width)
+{
+    return ImGui::CalcTextSize(view.data(), view.data() + view.size(), hide_text_after_double_hash, wrap_width);
+}
+
 void TextUnformatted(std::string_view view)
 {
     ImGui::TextUnformatted(view.data(), view.data() + view.size());
@@ -58,7 +63,7 @@ void TextUnformattedCenteredX(std::string_view view, float width_x)
     {
         width_x = ImGui::GetContentRegionAvail().x;
     }
-    const ImVec2 text_size = ImGui::CalcTextSize(view.data(), view.data() + view.size());
+    const ImVec2 text_size = CalcTextSize(view);
     const float text_x = (width_x - text_size.x) / 2.0f;
 
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + text_x);
@@ -170,13 +175,6 @@ ImU32 ImAlphaBlendColors(ImU32 col_a, ImU32 col_b)
     return IM_COL32(r, g, b, 0xFF);
 }
 
-ImU32 CreateColor(ImU32 color, uint8_t alpha)
-{
-    ImU32 rgb = color & 0x00FFFFFF;
-    ImU32 newAlpha = static_cast<ImU32>(alpha) << 24;
-    return rgb | newAlpha;
-}
-
 void DrawInTextCircle(ImU32 color)
 {
     const ImVec2 pos = ImGui::GetCursorScreenPos();
@@ -186,6 +184,17 @@ void DrawInTextCircle(ImU32 color)
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
     draw_list->AddCircleFilled(ImVec2(pos.x + x_radius, pos.y + y_radius), x_radius, color, 0);
     ImGui::SetCursorScreenPos(ImVec2(pos.x + font_size.x, pos.y));
+}
+
+void DrawTextBackgroundColor(std::string_view view, ImU32 color, const ImVec2 &pos)
+{
+    if (!view.empty())
+    {
+        const ImVec2 size = CalcTextSize(view, true);
+        const ImRect rect(pos, ImVec2(pos.x + size.x, pos.y + size.y));
+        ImDrawList *drawList = ImGui::GetWindowDrawList();
+        drawList->AddRectFilled(rect.Min, rect.Max, color);
+    }
 }
 
 bool ApplyPlacementToNextWindow(WindowPlacement &placement)

@@ -39,6 +39,8 @@ private:
     int m_popStyleCount = 0;
 };
 
+ImVec2 CalcTextSize(std::string_view view, bool hide_text_after_double_hash = false, float wrap_width = -1.0f);
+
 void TextUnformatted(std::string_view view);
 void TextUnformattedCenteredX(std::string_view view, float width_x = 0.f);
 
@@ -52,9 +54,17 @@ void TooltipTextUnformattedMarker(const char *text, const char *text_end = nullp
 void OverlayProgressBar(const ImRect &rect, float fraction, const char *overlay = nullptr);
 
 ImU32 ImAlphaBlendColors(ImU32 col_a, ImU32 col_b);
-ImU32 CreateColor(ImU32 color, uint8_t alpha);
+
+constexpr ImU32 CreateColor(ImU32 color, uint8_t alpha)
+{
+    ImU32 rgb = color & 0x00FFFFFF;
+    ImU32 newAlpha = static_cast<ImU32>(alpha) << 24;
+    return rgb | newAlpha;
+}
 
 void DrawInTextCircle(ImU32 color);
+
+void DrawTextBackgroundColor(std::string_view view, ImU32 color, const ImVec2 &pos);
 
 bool ApplyPlacementToNextWindow(WindowPlacement &placement);
 void FetchPlacementFromWindowByName(WindowPlacement &placement, const char *window_name);

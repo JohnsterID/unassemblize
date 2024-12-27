@@ -843,11 +843,8 @@ void Function::disassemble(const FunctionSetup &setup)
 
         if (!ZYAN_SUCCESS(status))
         {
+            // If this branch is hit, then it likely means there was a instruction text formatting error.
             asm_instruction.isInvalid = true;
-            for (ZyanU8 i = 0; i < instruction.info.length; ++i)
-            {
-                asm_instruction.text += fmt::format("{:02X}", section_data[instruction_section_offset + i]);
-            }
         }
         else
         {
@@ -876,7 +873,7 @@ void Function::disassemble(const FunctionSetup &setup)
                     {
                         const int64_t offset = int64_t(jump_address) - int64_t(instruction_address);
 #if 0 // Cannot assert this when disassembling a range beyond a single function.
-                        assert(std::abs(offset) < (1 << (sizeof(InstructionData::jumpLen) * 8)) / 2);
+                        assert(std::abs(offset) < (1 << (sizeof(AsmInstruction::jumpLen) * 8)) / 2);
 #endif
                         asm_instruction.isJump = true;
                         asm_instruction.jumpLen = offset;

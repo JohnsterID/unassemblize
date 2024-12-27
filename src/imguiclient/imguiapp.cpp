@@ -22,10 +22,8 @@
 
 namespace unassemblize::gui
 {
-ImGuiApp::AssemblerTableColumnsDrawer::AssemblerTableColumnsDrawer(
-    const TextFileContent *fileContent,
-    std::string &textBuffer) :
-    m_fileContent(fileContent), m_textBuffer(textBuffer)
+ImGuiApp::AssemblerTableColumnsDrawer::AssemblerTableColumnsDrawer(const TextFileContent *fileContent) :
+    m_fileContent(fileContent)
 {
 }
 
@@ -39,12 +37,13 @@ void ImGuiApp::AssemblerTableColumnsDrawer::SetupColumns(const std::vector<Assem
 
 void ImGuiApp::AssemblerTableColumnsDrawer::PrintAsmInstructionColumns(
     const std::vector<AssemblerTableColumn> &columns,
-    const AsmInstruction &instruction)
+    const AsmInstruction &instruction,
+    const AsmMismatchInfo &mismatchInfo)
 {
     for (AssemblerTableColumn column : columns)
     {
         ImGui::TableNextColumn();
-        PrintAsmInstructionColumn(column, instruction);
+        PrintAsmInstructionColumn(column, instruction, mismatchInfo);
     }
 }
 
@@ -83,7 +82,8 @@ void ImGuiApp::AssemblerTableColumnsDrawer::SetupColumn(AssemblerTableColumn col
 
 void ImGuiApp::AssemblerTableColumnsDrawer::PrintAsmInstructionColumn(
     AssemblerTableColumn column,
-    const AsmInstruction &instruction)
+    const AsmInstruction &instruction,
+    const AsmMismatchInfo &mismatchInfo)
 {
     // Note: Must always print a character in a row to satisfy the ImGui clipper.
 
@@ -100,15 +100,13 @@ void ImGuiApp::AssemblerTableColumnsDrawer::PrintAsmInstructionColumn(
                 TextUnformatted(" ");
             break;
         case AssemblerTableColumn::Bytes:
-            if (!ImGuiApp::PrintAsmInstructionBytes(m_textBuffer, instruction))
-                TextUnformatted(" ");
+            ImGuiApp::PrintAsmInstructionBytes(instruction);
             break;
         case AssemblerTableColumn::Address:
             ImGuiApp::PrintAsmInstructionAddress(instruction);
             break;
         case AssemblerTableColumn::Assembler:
-            if (!ImGuiApp::PrintAsmInstructionAssembler(m_textBuffer, instruction))
-                TextUnformatted(" ");
+            ImGuiApp::PrintAsmInstructionAssembler(instruction, mismatchInfo);
             break;
     }
 }
@@ -2860,7 +2858,7 @@ void ImGuiApp::ComparisonManagerMatchedFunctionContentTable(
     const TextFileContent *fileContent = fileRevision.m_fileContentStorage.find_content(sourceFile);
     const bool showSourceCodeColumns = fileContent != nullptr;
     const std::vector<AssemblerTableColumn> &assemblerTableColumns = GetAssemblerTableColumns(side, showSourceCodeColumns);
-    AssemblerTableColumnsDrawer columnsDrawer(fileContent, s_textBuffer1024);
+    AssemblerTableColumnsDrawer columnsDrawer(fileContent);
 
     const ImVec2 tableSize(0.0f, GetMaxTableHeight(records.size()));
     ImScoped::Table table("##function_assembler_table", assemblerTableColumns.size(), AssemblerTableFlags, tableSize);
@@ -2886,9 +2884,20 @@ void ImGuiApp::ComparisonManagerMatchedFunctionContentTable(
                 const AsmComparisonRecord &record = records[n];
                 if (const AsmInstructionPair *instructionPair = std::get_if<AsmInstructionPair>(&record))
                 {
+                    // #TODO: Make strictness configurable.
+                    const AsmMismatchInfo mismatchInfo = instructionPair->mismatch_info;
+                    const AsmMatchValueEx matchValue = mismatchInfo.get_match_value_ex(AsmMatchStrictness::Undecided);
+
+                    if (matchValue != AsmMatchValueEx::IsMatch)
+                    {
+                        ImU32 color = GetAsmMatchValueColor(matchValue);
+                        color = CreateColor(color, (n % 2 == 0) ? 32 : 48);
+                        ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, color);
+                    }
+
                     if (const AsmInstruction *instruction = instructionPair->pair[side])
                     {
-                        columnsDrawer.PrintAsmInstructionColumns(assemblerTableColumns, *instruction);
+                        columnsDrawer.PrintAsmInstructionColumns(assemblerTableColumns, *instruction, mismatchInfo);
                         continue;
                     }
                 }
@@ -2997,7 +3006,7 @@ void ImGuiApp::ComparisonManagerNamedFunctionContentTable(
     const TextFileContent *fileContent = fileRevision.m_fileContentStorage.find_content(sourceFile);
     const bool showSourceCodeColumns = fileContent != nullptr;
     const std::vector<AssemblerTableColumn> &assemblerTableColumns = GetAssemblerTableColumns(side, showSourceCodeColumns);
-    AssemblerTableColumnsDrawer columnsDrawer(fileContent, s_textBuffer1024);
+    AssemblerTableColumnsDrawer columnsDrawer(fileContent);
 
     ImScoped::Table table(
         "##function_assembler_table",
@@ -3072,8 +3081,9 @@ bool ImGuiApp::PrintAsmInstructionSourceCode(const AsmInstruction &instruction, 
     return false;
 }
 
-bool ImGuiApp::PrintAsmInstructionBytes(std::string &buf, const AsmInstruction &instruction)
+void ImGuiApp::PrintAsmInstructionBytes(const AsmInstruction &instruction)
 {
+    std::string &buf = s_textBuffer1024;
     buf.clear();
     uint8_t b = 0;
     for (; b < instruction.bytes.size - 1; ++b)
@@ -3084,8 +3094,8 @@ bool ImGuiApp::PrintAsmInstructionBytes(std::string &buf, const AsmInstruction &
     {
         buf += fmt::format("{:02x}", instruction.bytes.elements[b]);
     }
+    assert(!buf.empty());
     TextUnformatted(buf);
-    return !buf.empty();
 }
 
 void ImGuiApp::PrintAsmInstructionAddress(const AsmInstruction &instruction)
@@ -3093,31 +3103,64 @@ void ImGuiApp::PrintAsmInstructionAddress(const AsmInstruction &instruction)
     ImGui::Text("%08x", down_cast<uint32_t>(instruction.address));
 }
 
-bool ImGuiApp::PrintAsmInstructionAssembler(std::string &buf, const AsmInstruction &instruction)
+void ImGuiApp::PrintAsmInstructionAssembler(const AsmInstruction &instruction, const AsmMismatchInfo &mismatchInfo)
 {
-    constexpr std::string_view quote = "\"";
-
     if (instruction.isInvalid)
     {
         TextUnformatted("Unrecognized opcode");
-        return true;
     }
     else
     {
-        buf = instruction.text;
-        util::strip_inplace(buf, quote);
-        TextUnformatted(buf);
+        assert(!instruction.text.empty());
+
+        // #TODO: Make strictness configurable.
+        const AsmMatchStrictness strictness = AsmMatchStrictness::Undecided;
+        auto mismatchBits = mismatchInfo.mismatch_bits;
+        if (strictness != AsmMatchStrictness::Lenient)
+        {
+            mismatchBits |= mismatchInfo.maybe_mismatch_bits;
+        }
+
+        if (mismatchBits != 0)
+        {
+            const InstructionTextArray textArray = split_instruction_text(instruction.text);
+
+            for (size_t i = 0; i < textArray.size; ++i)
+            {
+                if (mismatchBits & (1 << i))
+                {
+                    const ImU32 color = GetMismatchBitColor(mismatchInfo, i);
+                    const auto preTextLen = static_cast<size_t>(textArray.elements[i].data() - instruction.text.data());
+                    const std::string_view preText{instruction.text.data(), preTextLen};
+                    const ImVec2 textSize = CalcTextSize(preText, true);
+                    ImVec2 pos = ImGui::GetCursorScreenPos();
+                    pos.x += textSize.x;
+
+                    DrawTextBackgroundColor(textArray.elements[i], color, pos);
+                }
+            }
+        }
+
+        TextUnformatted(instruction.text);
 
         if (instruction.isJump)
         {
             ImGui::SameLine();
 
+            std::string &buf = s_textBuffer1024;
             buf = fmt::format("{:+d} bytes", instruction.jumpLen);
 
-            ImScoped::StyleColor greyText(ImGuiCol_Text, LightGrayColor);
-            TextUnformatted(buf);
+            if (mismatchInfo.mismatch_reasons & AsmMismatchReason_JumpLen)
+            {
+                DrawTextBackgroundColor(buf, MismatchBgColor, ImGui::GetCursorScreenPos());
+                TextUnformatted(buf);
+            }
+            else
+            {
+                ImScoped::StyleColor greyText(ImGuiCol_Text, LightGrayColor);
+                TextUnformatted(buf);
+            }
         }
-        return !buf.empty();
     }
 }
 
@@ -3153,8 +3196,17 @@ void ImGuiApp::ComparisonManagerMatchedFunctionDiffSymbolTable(const AsmComparis
                 const AsmComparisonRecord &record = records[n];
                 if (const AsmInstructionPair *instructionPair = std::get_if<AsmInstructionPair>(&record))
                 {
+                    // #TODO: Make strictness configurable.
+                    const AsmMatchValueEx matchValue =
+                        instructionPair->mismatch_info.get_match_value_ex(AsmMatchStrictness::Undecided);
+
+                    ImU32 color = GetAsmMatchValueColor(matchValue);
+                    color = CreateColor(color, (n % 2 == 0) ? 112 : 128);
+
+                    ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, color);
                     ImGui::TableNextColumn();
-                    PrintDiffSymbol(*instructionPair);
+
+                    TextUnformattedCenteredX(AsmMatchValueStringArray[size_t(matchValue)]);
                 }
                 else
                 {
@@ -3167,19 +3219,12 @@ void ImGuiApp::ComparisonManagerMatchedFunctionDiffSymbolTable(const AsmComparis
     }
 }
 
-void ImGuiApp::PrintDiffSymbol(const AsmInstructionPair &instructionPair)
-{
-    // #TODO: Make strictness configurable.
-    const AsmMatchValueEx matchValue = instructionPair.mismatch_info.get_match_value_ex(AsmMatchStrictness::Lenient);
-
-    TextUnformattedCenteredX(AsmMatchValueStringArray[size_t(matchValue)]);
-}
-
 void ImGuiApp::ComparisonManagerItemListStyleColor(
     ScopedStyleColor &styleColor,
     const ProgramComparisonDescriptor::File::ListItemUiInfo &uiInfo,
     float offsetX)
 {
+    // Set main color for text background.
     ImU32 mainColor;
 
     assert(uiInfo.m_similarity.has_value());
@@ -3196,15 +3241,11 @@ void ImGuiApp::ComparisonManagerItemListStyleColor(
         mainColor = ImAlphaBlendColors(RedColor, CloseToGreenColor);
     }
 
-    // Set main color for text background.
-    const ImVec2 cursorPos = ImGui::GetCursorScreenPos();
-    const ImVec2 labelSize = ImGui::CalcTextSize(uiInfo.m_label.c_str(), nullptr, true);
-    const ImRect rect(
-        ImVec2(cursorPos.x + offsetX, cursorPos.y),
-        ImVec2(cursorPos.x + labelSize.x + offsetX, cursorPos.y + labelSize.y));
-
-    ImDrawList *drawList = ImGui::GetWindowDrawList();
-    drawList->AddRectFilled(rect.Min, rect.Max, CreateColor(mainColor, 128));
+    {
+        const ImU32 color = CreateColor(mainColor, 128);
+        const ImVec2 pos = ImGui::GetCursorScreenPos();
+        DrawTextBackgroundColor(uiInfo.m_label, color, ImVec2(pos.x + offsetX, pos.y));
+    }
 
     // Set blended colors for selectable region.
     const ImU32 headerColor = ImGui::ColorConvertFloat4ToU32(ImGui::GetStyleColorVec4(ImGuiCol_Header));
@@ -3293,6 +3334,45 @@ const std::vector<ImGuiApp::AssemblerTableColumn> &ImGuiApp::GetAssemblerTableCo
             else
                 return s_assemblerTableColumnsRight_NoSource;
     }
+}
+
+ImU32 ImGuiApp::GetAsmMatchValueColor(AsmMatchValueEx matchValue)
+{
+    switch (matchValue)
+    {
+        case AsmMatchValueEx::IsMatch:
+            return GreenColor;
+        case AsmMatchValueEx::IsMaybeMatch:
+            return YellowColor;
+        case AsmMatchValueEx::IsMismatch:
+            return RedColor;
+        case AsmMatchValueEx::IsMissingLeft:
+        case AsmMatchValueEx::IsMissingRight:
+            return BluePinkColor;
+        default:
+            assert(false);
+            return IM_COL32(0, 0, 0, 0);
+    }
+}
+
+ImU32 ImGuiApp::GetMismatchBitColor(const AsmMismatchInfo &mismatchInfo, int bit)
+{
+    ImU32 color;
+
+    if (mismatchInfo.mismatch_bits & (1 << bit))
+    {
+        color = MismatchBgColor;
+    }
+    else
+    {
+        assert(mismatchInfo.maybe_mismatch_bits & (1 << bit));
+        // #TODO: Make strictness configurable.
+        const AsmMatchStrictness strictness = AsmMatchStrictness::Undecided;
+        assert(strictness != AsmMatchStrictness::Lenient);
+        color = strictness == AsmMatchStrictness::Strict ? MismatchBgColor : MaybeMismatchBgColor;
+    }
+
+    return color;
 }
 
 } // namespace unassemblize::gui

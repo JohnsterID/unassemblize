@@ -54,6 +54,7 @@ InstructionTextArray split_instruction_text(std::string_view text)
 {
     InstructionTextArray arr;
     size_t index = 0;
+    size_t wordLen;
     char wordSeperator = ' ';
     bool in_quote = false;
     const char *textEnd = text.data() + text.size();
@@ -70,7 +71,9 @@ InstructionTextArray split_instruction_text(std::string_view text)
         else if (!in_quote && *c == wordSeperator)
         {
             // Lock word.
-            arr.elements[index] = {wordBegin, static_cast<size_t>(c - wordBegin)};
+            wordLen = static_cast<size_t>(c - wordBegin);
+            assert(wordLen != 0);
+            arr.elements[index] = {wordBegin, wordLen};
             // Change word separator for operands.
             wordSeperator = ',';
             // Skip separator
@@ -87,7 +90,10 @@ InstructionTextArray split_instruction_text(std::string_view text)
         }
         ++c;
     }
-    arr.elements[index] = {wordBegin, static_cast<size_t>(c - wordBegin)};
+
+    wordLen = static_cast<size_t>(c - wordBegin);
+    assert(wordLen != 0);
+    arr.elements[index] = {wordBegin, wordLen};
     arr.size = index + 1;
     return arr;
 }
