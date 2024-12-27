@@ -18,7 +18,8 @@ namespace unassemblize
 {
 class AsmMatcher
 {
-    using InstructionTextArray = SizedArray<std::string, size_t, 4>;
+    using InstructionTextArray = SizedArray<std::string_view, size_t, 4>; // #TODO: Move to asmmatchertypes.h?
+
     using InstructionTextArrays = std::vector<InstructionTextArray>;
 
     struct LookaheadResult

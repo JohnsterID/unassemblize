@@ -362,18 +362,19 @@ AsmMismatchInfo AsmMatcher::compare_asm_text(const InstructionTextArray &array0,
     // Note: All symbols, including pseudo symbols, are expected to be enclosed by quotes.
 
     AsmMismatchInfo result;
+    size_t i = 0;
 
-    std::string dummy;
-
-    for (size_t i = 0; i < array0.size || i < array1.size; ++i)
+    for (; i < array0.size && i < array1.size; ++i)
     {
-        const std::string &word0 = (i < array0.size) ? array0.elements[i] : dummy;
-        const std::string &word1 = (i < array1.size) ? array1.elements[i] : dummy;
-        const char *c0 = word0.c_str();
-        const char *c1 = word1.c_str();
+        const std::string_view &word0 = array0.elements[i];
+        const std::string_view &word1 = array1.elements[i];
+        const char *c0 = word0.data();
+        const char *c1 = word1.data();
+        const char *end0 = c0 + word0.size();
+        const char *end1 = c1 + word1.size();
         int in_quote = -1;
 
-        for (; *c0 != '\0' || *c1 != '\0'; ++c0, ++c1)
+        for (; c0 != end0 && c1 != end1; ++c0, ++c1)
         {
             if (*c0 == '\"' && *c1 == '\"')
             {
@@ -459,6 +460,12 @@ AsmMismatchInfo AsmMatcher::compare_asm_text(const InstructionTextArray &array0,
         }
     }
 
+    // All left over words on either side are treated as mismatch.
+    for (; i < array0.size || i < array1.size; ++i)
+    {
+        result.mismatch_bits |= (1 << i);
+    }
+
     // Verifies that no bits are shared across both bit fields.
     assert((result.mismatch_bits ^ result.maybe_mismatch_bits) == (result.mismatch_bits | result.maybe_mismatch_bits));
 
@@ -514,31 +521,40 @@ AsmMatcher::InstructionTextArray AsmMatcher::split_instruction_text(std::string_
 {
     InstructionTextArray arr;
     size_t index = 0;
-    char sep = ' ';
+    char wordSeperator = ' ';
     bool in_quote = false;
-    const char *end = text.data() + text.size();
+    const char *textEnd = text.data() + text.size();
+    const char *wordBegin = text.data();
+    const char *c = text.data();
 
-    for (const char *c = text.data(); c != end; ++c)
+    while (c != textEnd)
     {
         if (*c == '\"')
         {
             // Does not look for separator inside quoted text.
             in_quote = !in_quote;
         }
-        else if (!in_quote && *c == sep)
+        else if (!in_quote && *c == wordSeperator)
         {
+            // Lock word.
+            arr.elements[index] = {wordBegin, static_cast<size_t>(c - wordBegin)};
             // Change word separator for operands.
-            sep = ',';
+            wordSeperator = ',';
+            // Skip separator
+            ++c;
             // Omit spaces between operands.
-            while (*(c + 1) == ' ')
+            while (*c == ' ')
                 ++c;
             // Increment word index.
             ++index;
             assert(index < arr.elements.size());
+            // Store new word begin.
+            wordBegin = c;
             continue;
         }
-        arr.elements[index].push_back(*c);
+        ++c;
     }
+    arr.elements[index] = {wordBegin, static_cast<size_t>(c - wordBegin)};
     arr.size = index + 1;
     return arr;
 }
