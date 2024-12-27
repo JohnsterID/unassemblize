@@ -44,10 +44,10 @@ AsmFormat to_asm_format(std::string_view str)
 
 void AsmInstruction::set_bytes(const uint8_t *p, size_t size)
 {
-    assert(size <= bytes.elements.size());
-    const size_t max_bytes = std::min<size_t>(bytes.elements.size(), size);
-    memcpy(bytes.elements.data(), p, max_bytes);
-    bytes.size = uint8_t(max_bytes);
+    assert(size <= bytes.max_size());
+    const size_t max_bytes = std::min<size_t>(bytes.max_size(), size);
+    memcpy(bytes.data(), p, max_bytes);
+    bytes.set_size(static_cast<uint8_t>(max_bytes));
 }
 
 InstructionTextArray split_instruction_text(std::string_view text)
@@ -73,7 +73,7 @@ InstructionTextArray split_instruction_text(std::string_view text)
             // Lock word.
             wordLen = static_cast<size_t>(c - wordBegin);
             assert(wordLen != 0);
-            arr.elements[index] = {wordBegin, wordLen};
+            arr[index] = {wordBegin, wordLen};
             // Change word separator for operands.
             wordSeperator = ',';
             // Skip separator
@@ -83,7 +83,7 @@ InstructionTextArray split_instruction_text(std::string_view text)
                 ++c;
             // Increment word index.
             ++index;
-            assert(index < arr.elements.size());
+            assert(index < arr.max_size());
             // Store new word begin.
             wordBegin = c;
             continue;
@@ -93,8 +93,8 @@ InstructionTextArray split_instruction_text(std::string_view text)
 
     wordLen = static_cast<size_t>(c - wordBegin);
     assert(wordLen != 0);
-    arr.elements[index] = {wordBegin, wordLen};
-    arr.size = index + 1;
+    arr[index] = {wordBegin, wordLen};
+    arr.set_size(index + 1);
     return arr;
 }
 

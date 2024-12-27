@@ -47,7 +47,6 @@ struct AsmInstruction
     AsmInstruction()
     {
         address = 0;
-        std::fill_n(bytes.elements.data(), bytes.elements.size(), 0);
         isJump = false;
         isJumpedTo = false;
         isInvalid = false;

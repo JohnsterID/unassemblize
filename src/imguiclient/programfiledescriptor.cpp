@@ -46,8 +46,8 @@ WorkQueueCommandId ProgramFileDescriptor::get_first_active_command_id() const
         WorkState::WorkQueueCommandIdArray<1> commandIdArray =
             m_revisionDescriptor->m_asyncWorkState.get_command_id_array<1>(reasonMask);
 
-        if (commandIdArray.size >= 1)
-            return commandIdArray.elements[0];
+        if (commandIdArray.size() >= 1)
+            return commandIdArray[0];
     }
 
     return InvalidWorkQueueCommandId;

@@ -3086,13 +3086,13 @@ void ImGuiApp::PrintAsmInstructionBytes(const AsmInstruction &instruction)
     std::string &buf = s_textBuffer1024;
     buf.clear();
     uint8_t b = 0;
-    for (; b < instruction.bytes.size - 1; ++b)
+    for (; b < instruction.bytes.size() - 1; ++b)
     {
-        buf += fmt::format("{:02x} ", instruction.bytes.elements[b]);
+        buf += fmt::format("{:02x} ", instruction.bytes[b]);
     }
-    if (b < instruction.bytes.size)
+    if (b < instruction.bytes.size())
     {
-        buf += fmt::format("{:02x}", instruction.bytes.elements[b]);
+        buf += fmt::format("{:02x}", instruction.bytes[b]);
     }
     assert(!buf.empty());
     TextUnformatted(buf);
@@ -3125,18 +3125,18 @@ void ImGuiApp::PrintAsmInstructionAssembler(const AsmInstruction &instruction, c
         {
             const InstructionTextArray textArray = split_instruction_text(instruction.text);
 
-            for (size_t i = 0; i < textArray.size; ++i)
+            for (size_t i = 0; i < textArray.size(); ++i)
             {
                 if (mismatchBits & (1 << i))
                 {
                     const ImU32 color = GetMismatchBitColor(mismatchInfo, i);
-                    const auto preTextLen = static_cast<size_t>(textArray.elements[i].data() - instruction.text.data());
+                    const auto preTextLen = static_cast<size_t>(textArray[i].data() - instruction.text.data());
                     const std::string_view preText{instruction.text.data(), preTextLen};
                     const ImVec2 textSize = CalcTextSize(preText, true);
                     ImVec2 pos = ImGui::GetCursorScreenPos();
                     pos.x += textSize.x;
 
-                    DrawTextBackgroundColor(textArray.elements[i], color, pos);
+                    DrawTextBackgroundColor(textArray[i], color, pos);
                 }
             }
         }

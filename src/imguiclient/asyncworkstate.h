@@ -49,15 +49,16 @@ public:
     {
         const uint32_t count = std::min<uint32_t>(Size, m_workItems.size());
         WorkQueueCommandIdArray<Size> commandIdArray;
-        uint32_t &arrayIndex = commandIdArray.size;
+        uint32_t arrayIndex = commandIdArray.size();
         for (uint32_t itemIdx = 0; itemIdx < count; ++itemIdx)
         {
             const WorkItem &item = m_workItems[itemIdx];
             if ((uint64_t(1) << uint64_t(item.reason)) & reasonMask)
             {
-                commandIdArray.elements[arrayIndex++] = item.commandId;
+                commandIdArray[arrayIndex++] = item.commandId;
             }
         }
+        commandIdArray.set_size(arrayIndex);
         return commandIdArray;
     }
 

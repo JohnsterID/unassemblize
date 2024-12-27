@@ -364,10 +364,10 @@ AsmMismatchInfo AsmMatcher::compare_asm_text(const InstructionTextArray &array0,
     AsmMismatchInfo result;
     size_t i = 0;
 
-    for (; i < array0.size && i < array1.size; ++i)
+    for (; i < array0.size() && i < array1.size(); ++i)
     {
-        const std::string_view &word0 = array0.elements[i];
-        const std::string_view &word1 = array1.elements[i];
+        const std::string_view &word0 = array0[i];
+        const std::string_view &word1 = array1[i];
         const char *c0 = word0.data();
         const char *c1 = word1.data();
         const char *end0 = c0 + word0.size();
@@ -461,7 +461,7 @@ AsmMismatchInfo AsmMatcher::compare_asm_text(const InstructionTextArray &array0,
     }
 
     // All left over words on either side are treated as mismatch.
-    for (; i < array0.size || i < array1.size; ++i)
+    for (; i < array0.size() || i < array1.size(); ++i)
     {
         result.mismatch_bits |= (1 << i);
     }

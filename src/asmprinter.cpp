@@ -344,11 +344,11 @@ void AsmPrinter::append_bytes(Buffers &buffers, const AsmComparisonRecords &reco
             const AsmInstruction *instruction = instruction_pair->pair[side_idx];
             if (instruction != nullptr)
             {
-                const size_t usable_byte_count = std::min<size_t>(byte_count, instruction->bytes.size);
+                const size_t usable_byte_count = std::min<size_t>(byte_count, instruction->bytes.size());
 
                 for (size_t b = 0; b < usable_byte_count; ++b)
                 {
-                    line += fmt::format("{:02x} ", instruction->bytes.elements[b]);
+                    line += fmt::format("{:02x} ", instruction->bytes[b]);
                 }
             }
         }
