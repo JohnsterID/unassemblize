@@ -680,30 +680,27 @@ void Function::set_source_file(const PdbSourceFileInfo &source_file, const PdbSo
     size_t source_line_index = 0;
     uint16_t last_line_number = 0;
 
-    for (AsmInstructionVariant &variant : m_instructions)
+    for (AsmInstruction &instruction : m_instructions)
     {
-        if (AsmInstruction *instruction = std::get_if<AsmInstruction>(&variant))
+        const size_t count = source_lines.size();
+
+        for (; source_line_index < count; ++source_line_index)
         {
-            const size_t count = source_lines.size();
+            const PdbSourceLineInfo &source_line = source_lines[source_line_index];
 
-            for (; source_line_index < count; ++source_line_index)
+            if (instruction.address >= m_beginAddress + source_line.offset
+                && instruction.address < m_beginAddress + source_line.offset + source_line.length)
             {
-                const PdbSourceLineInfo &source_line = source_lines[source_line_index];
-
-                if (instruction->address >= m_beginAddress + source_line.offset
-                    && instruction->address < m_beginAddress + source_line.offset + source_line.length)
+                instruction.lineNumber = source_line.lineNumber;
+                if (last_line_number != source_line.lineNumber)
                 {
-                    instruction->lineNumber = source_line.lineNumber;
-                    if (last_line_number != source_line.lineNumber)
-                    {
-                        instruction->isFirstLine = true;
-                        last_line_number = source_line.lineNumber;
-                    }
-                    break;
+                    instruction.isFirstLine = true;
+                    last_line_number = source_line.lineNumber;
                 }
+                break;
             }
-            assert(instruction->lineNumber != 0);
         }
+        assert(instruction.lineNumber != 0);
     }
 }
 
@@ -734,12 +731,12 @@ void Function::disassemble(const FunctionSetup &setup)
         return;
     }
 
-    FunctionIntermediate intermediate(setup);
-    m_intermediate = &intermediate;
-
+    m_setup = &setup;
+    util::free_container(m_sourceFileName);
     util::free_container(m_instructions);
-    m_instructionCount = 0;
-    m_labelCount = 0;
+    util::free_container(m_pseudoSymbols);
+    util::free_container(m_pseudoSymbolAddressToIndexMap);
+    m_symbolCount = 0;
 
     const Address64T image_base = setup.m_executable.image_base();
     const uint8_t *section_data = section_info->data;
@@ -749,7 +746,6 @@ void Function::disassemble(const FunctionSetup &setup)
     char instruction_buffer[4096];
     instruction_buffer[0] = '\0';
     size_t instruction_count = 0;
-    size_t label_count = 0;
 
     // Loop through function once to identify all jumps to local labels and create them.
     while (section_offset < section_offset_end)
@@ -768,14 +764,6 @@ void Function::disassemble(const FunctionSetup &setup)
         section_offset += instruction.info.length;
         ++instruction_count;
 
-        {
-            const ExeSymbol *symbol = setup.m_executable.get_symbol(instruction_address);
-            if (symbol != nullptr)
-            {
-                ++label_count;
-            }
-        }
-
         if (!ZYAN_SUCCESS(status))
         {
             continue;
@@ -791,15 +779,12 @@ void Function::disassemble(const FunctionSetup &setup)
             {
                 const std::string_view prefix = is_call(&instruction.info) ? s_prefix_sub : s_prefix_loc;
 
-                if (add_pseudo_symbol(absolute_address, prefix))
-                {
-                    ++label_count;
-                }
+                add_pseudo_symbol(absolute_address, prefix);
             }
         }
     }
 
-    m_instructions.reserve(instruction_count + label_count);
+    m_instructions.reserve(instruction_count);
     section_offset = m_beginAddress - address_offset;
     runtime_address = m_beginAddress;
 
@@ -808,19 +793,6 @@ void Function::disassemble(const FunctionSetup &setup)
     {
         const Address64T instruction_address = runtime_address;
         const Address64T instruction_section_offset = section_offset;
-
-        bool isJumpedTo = false;
-        {
-            const ExeSymbol *symbol = get_symbol(instruction_address);
-            if (symbol != nullptr)
-            {
-                AsmLabel asm_label;
-                asm_label.label = symbol->name;
-                m_instructions.emplace_back(std::move(asm_label));
-                ++m_labelCount;
-                isJumpedTo = true;
-            }
-        }
 
         const ZyanStatus status = UnasmDisassembleCustom(
             setup.m_formatter,
@@ -835,7 +807,11 @@ void Function::disassemble(const FunctionSetup &setup)
         AsmInstruction asm_instruction;
         asm_instruction.address = runtime_address;
         asm_instruction.set_bytes(section_data + instruction_section_offset, instruction.info.length);
-        asm_instruction.isJumpedTo = isJumpedTo;
+        if (get_symbol(instruction_address) != nullptr)
+        {
+            asm_instruction.isSymbol = true;
+            ++m_symbolCount;
+        }
 
         runtime_address += instruction.info.length;
         section_offset += instruction.info.length;
@@ -883,13 +859,11 @@ void Function::disassemble(const FunctionSetup &setup)
         }
 
         m_instructions.emplace_back(std::move(asm_instruction));
-        ++m_instructionCount;
     }
 
     assert(instruction_index == instruction_count);
-    assert(m_instructions.size() == static_cast<size_t>(m_instructionCount + m_labelCount));
 
-    m_intermediate = nullptr;
+    m_setup = nullptr;
 }
 
 bool Function::add_pseudo_symbol(Address64T address, std::string_view prefix)
@@ -902,8 +876,8 @@ bool Function::add_pseudo_symbol(Address64T address, std::string_view prefix)
         }
     }
 
-    auto &pseudoSymbolVec = m_intermediate->m_pseudoSymbols;
-    auto &pseudoSymbolMap = m_intermediate->m_pseudoSymbolAddressToIndexMap;
+    auto &pseudoSymbolVec = m_pseudoSymbols;
+    auto &pseudoSymbolMap = m_pseudoSymbolAddressToIndexMap;
 
     Address64ToIndexMap::iterator it = pseudoSymbolMap.find(address);
 
@@ -925,9 +899,23 @@ bool Function::add_pseudo_symbol(Address64T address, std::string_view prefix)
     return true;
 }
 
+const ExeSymbol *Function::get_pseudo_symbol(Address64T address) const
+{
+    const auto &pseudoSymbolVec = m_pseudoSymbols;
+    const auto &pseudoSymbolMap = m_pseudoSymbolAddressToIndexMap;
+
+    Address64ToIndexMap::const_iterator it = pseudoSymbolMap.find(address);
+
+    if (it != pseudoSymbolMap.end())
+    {
+        return &pseudoSymbolVec[it->second];
+    }
+    return nullptr;
+}
+
 const FunctionSetup &Function::get_setup() const
 {
-    return m_intermediate->m_setup;
+    return *m_setup;
 }
 
 const Executable &Function::get_executable() const
@@ -972,16 +960,10 @@ ZydisFormatterRegisterFunc Function::get_default_print_register() const
 
 const ExeSymbol *Function::get_symbol(Address64T address) const
 {
-    const auto &pseudoSymbolVec = m_intermediate->m_pseudoSymbols;
-    const auto &pseudoSymbolMap = m_intermediate->m_pseudoSymbolAddressToIndexMap;
-
-    Address64ToIndexMap::const_iterator it = pseudoSymbolMap.find(address);
-
-    if (it != pseudoSymbolMap.end())
+    if (const ExeSymbol *symbol = get_pseudo_symbol(address))
     {
-        return &pseudoSymbolVec[it->second];
+        return symbol;
     }
-
     return get_executable().get_symbol(address);
 }
 
@@ -994,8 +976,8 @@ const ExeSymbol *Function::get_symbol_from_image_base(Address64T address) const
     }
 #endif
 
-    const auto &pseudoSymbolVec = m_intermediate->m_pseudoSymbols;
-    const auto &pseudoSymbolMap = m_intermediate->m_pseudoSymbolAddressToIndexMap;
+    const auto &pseudoSymbolVec = m_pseudoSymbols;
+    const auto &pseudoSymbolMap = m_pseudoSymbolAddressToIndexMap;
 
     Address64ToIndexMap::const_iterator it = pseudoSymbolMap.find(address - get_executable().image_base());
 
@@ -1005,6 +987,20 @@ const ExeSymbol *Function::get_symbol_from_image_base(Address64T address) const
     }
 
     return get_executable().get_symbol_from_image_base(address);
+}
+
+const ExeSymbol *get_symbol_or_pseudo_symbol(Address64T address, const Executable &executable, const Function &function)
+{
+    if (const ExeSymbol *symbol = function.get_pseudo_symbol(address))
+    {
+        return symbol;
+    }
+    else if (const ExeSymbol *symbol = executable.get_symbol(address))
+    {
+        return symbol;
+    }
+
+    return nullptr;
 }
 
 } // namespace unassemblize

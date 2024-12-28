@@ -30,13 +30,18 @@ class AsmPrinter
 
 public:
     // Appends texts from instruction data to a string.
-    static void append_to_string(std::string &str, const AsmInstructionVariants &instructions, uint32_t indent_len);
+    static void append_to_string(
+        std::string &str,
+        const Executable &executable,
+        const Function &function,
+        uint32_t indent_len);
 
     // Appends texts from instruction data of a comparison result to a string.
     void append_to_string(
         std::string &str,
         const AsmComparisonResult &comparison,
-        const StringPair &exe_filenames,
+        ConstNamedFunctionPair named_function_pair,
+        ConstExecutablePair executable_pair,
         const TextFileContentPair &source_file_texts,
         AsmMatchStrictness match_strictness,
         uint32_t indent_len,
@@ -47,7 +52,6 @@ public:
 
 private:
     static std::string to_string(const AsmInstruction &instruction, size_t indent_len);
-    static std::string to_string(const AsmLabel &label);
 
     static void append_source_code(
         Buffers &buffers,
@@ -60,6 +64,8 @@ private:
     static void append_assembler(
         Buffers &buffers,
         const AsmComparisonRecords &records,
+        const Executable &executable,
+        const Function &function,
         size_t side_idx,
         uint32_t asm_len,
         uint32_t indent_len);

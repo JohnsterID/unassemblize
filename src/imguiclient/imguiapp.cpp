@@ -47,17 +47,6 @@ void ImGuiApp::AssemblerTableColumnsDrawer::PrintAsmInstructionColumns(
     }
 }
 
-void ImGuiApp::AssemblerTableColumnsDrawer::PrintAsmLabelColumns(
-    const std::vector<AssemblerTableColumn> &columns,
-    const AsmLabel &label)
-{
-    for (AssemblerTableColumn column : columns)
-    {
-        ImGui::TableNextColumn();
-        PrintAsmLabelColumn(column, label);
-    }
-}
-
 void ImGuiApp::AssemblerTableColumnsDrawer::SetupColumn(AssemblerTableColumn column)
 {
     switch (column)
@@ -107,21 +96,6 @@ void ImGuiApp::AssemblerTableColumnsDrawer::PrintAsmInstructionColumn(
             break;
         case AssemblerTableColumn::Assembler:
             ImGuiApp::PrintAsmInstructionAssembler(instruction, mismatchInfo);
-            break;
-    }
-}
-
-void ImGuiApp::AssemblerTableColumnsDrawer::PrintAsmLabelColumn(AssemblerTableColumn column, const AsmLabel &label)
-{
-    // Note: Must always print a character in a row to satisfy the ImGui clipper.
-
-    switch (column)
-    {
-        default:
-            TextUnformatted(" ");
-            break;
-        case AssemblerTableColumn::Assembler:
-            ImGuiApp::PrintAsmLabel(label);
             break;
     }
 }
@@ -2882,39 +2856,31 @@ void ImGuiApp::ComparisonManagerMatchedFunctionContentTable(
                 ImGui::TableNextRow();
 
                 const AsmComparisonRecord &record = records[n];
-                if (const AsmInstructionPair *instructionPair = std::get_if<AsmInstructionPair>(&record))
-                {
-                    // #TODO: Make strictness configurable.
-                    const AsmMismatchInfo mismatchInfo = instructionPair->mismatch_info;
-                    const AsmMatchValueEx matchValue = mismatchInfo.get_match_value_ex(AsmMatchStrictness::Undecided);
+                // #TODO: Make strictness configurable.
+                const AsmMismatchInfo mismatchInfo = record.mismatch_info;
+                const AsmMatchValueEx matchValue = mismatchInfo.get_match_value_ex(AsmMatchStrictness::Undecided);
 
-                    if (matchValue != AsmMatchValueEx::IsMatch)
-                    {
-                        ImU32 color = GetAsmMatchValueColor(matchValue);
-                        color = CreateColor(color, (n % 2 == 0) ? 32 : 48);
-                        ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, color);
-                    }
-
-                    if (const AsmInstruction *instruction = instructionPair->pair[side])
-                    {
-                        columnsDrawer.PrintAsmInstructionColumns(assemblerTableColumns, *instruction, mismatchInfo);
-                        continue;
-                    }
-                }
-                else if (const AsmLabelPair *labelPair = std::get_if<AsmLabelPair>(&record))
+                if (matchValue != AsmMatchValueEx::IsMatch)
                 {
-                    if (const AsmLabel *label = labelPair->pair[side])
-                    {
-                        columnsDrawer.PrintAsmLabelColumns(assemblerTableColumns, *label);
-                        continue;
-                    }
+                    ImU32 color = GetAsmMatchValueColor(matchValue);
+                    color = CreateColor(color, (n % 2 == 0) ? 32 : 48);
+                    ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, color);
                 }
 
-                // Add empty columns with dummy texts to satisfy the clipper.
-                for (size_t i = 0; i < assemblerTableColumns.size(); ++i)
+                if (const AsmInstruction *instruction = record.pair[side])
                 {
-                    ImGui::TableNextColumn();
-                    TextUnformatted(" ");
+                    // #TODO: Set special background color to Address when AsmInstruction::isSymbol is true
+
+                    columnsDrawer.PrintAsmInstructionColumns(assemblerTableColumns, *instruction, mismatchInfo);
+                }
+                else
+                {
+                    // Add empty columns with dummy texts to satisfy the clipper.
+                    for (size_t i = 0; i < assemblerTableColumns.size(); ++i)
+                    {
+                        ImGui::TableNextColumn();
+                        TextUnformatted(" ");
+                    }
                 }
             }
         }
@@ -2938,7 +2904,7 @@ void ImGuiApp::ComparisonManagerNamedFunctions(
 
         const File::NamedFunctionUiInfo &uiInfo0 = file.m_namedFunctionUiInfos[namedFunctionIndex];
 
-        // #TODO: Check if node can be excluded from imgui ini save because it makes it big and slow.
+        // #TODO: Check if node can be excluded from ImGui INI save because it makes it big and slow.
         ImScoped::TreeNodeEx tree(
             uiInfo0.m_label.c_str(),
             ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth);
@@ -2957,7 +2923,7 @@ void ImGuiApp::ComparisonManagerNamedFunction(
 {
     assert(namedFunction.is_disassembled());
 
-    const AsmInstructionVariants &records = namedFunction.function.get_instructions();
+    const AsmInstructions &records = namedFunction.function.get_instructions();
 
     // Constrain the child window to max height of the table inside.
     // + 4 because the child tables add this much somewhere (???).
@@ -3001,7 +2967,7 @@ void ImGuiApp::ComparisonManagerNamedFunctionContentTable(
     const ProgramFileRevisionDescriptor &fileRevision,
     const NamedFunction &namedFunction)
 {
-    const AsmInstructionVariants &records = namedFunction.function.get_instructions();
+    const AsmInstructions &instructions = namedFunction.function.get_instructions();
     const std::string &sourceFile = namedFunction.function.get_source_file_name();
     const TextFileContent *fileContent = fileRevision.m_fileContentStorage.find_content(sourceFile);
     const bool showSourceCodeColumns = fileContent != nullptr;
@@ -3022,7 +2988,7 @@ void ImGuiApp::ComparisonManagerNamedFunctionContentTable(
         ImGui::TableHeadersRow();
 
         ImGuiListClipper clipper;
-        clipper.Begin(records.size());
+        clipper.Begin(instructions.size());
 
         while (clipper.Step())
         {
@@ -3030,19 +2996,7 @@ void ImGuiApp::ComparisonManagerNamedFunctionContentTable(
             {
                 ImGui::TableNextRow();
 
-                const AsmInstructionVariant &record = records[n];
-                if (const AsmInstruction *instruction = std::get_if<AsmInstruction>(&record))
-                {
-                    columnsDrawer.PrintAsmInstructionColumns(assemblerTableColumns, *instruction);
-                }
-                else if (const AsmLabel *label = std::get_if<AsmLabel>(&record))
-                {
-                    columnsDrawer.PrintAsmLabelColumns(assemblerTableColumns, *label);
-                }
-                else
-                {
-                    assert(false);
-                }
+                columnsDrawer.PrintAsmInstructionColumns(assemblerTableColumns, instructions[n]);
             }
         }
     }
@@ -3164,14 +3118,6 @@ void ImGuiApp::PrintAsmInstructionAssembler(const AsmInstruction &instruction, c
     }
 }
 
-void ImGuiApp::PrintAsmLabel(const AsmLabel &label)
-{
-    ImScoped::StyleColor greyText(ImGuiCol_Text, LightGrayColor);
-    TextUnformatted(label.label.c_str());
-    ImGui::SameLine();
-    TextUnformatted(":");
-}
-
 void ImGuiApp::ComparisonManagerMatchedFunctionDiffSymbolTable(const AsmComparisonRecords &records)
 {
     constexpr ImGuiTableFlags tableFlags =
@@ -3194,26 +3140,16 @@ void ImGuiApp::ComparisonManagerMatchedFunctionDiffSymbolTable(const AsmComparis
                 ImGui::TableNextRow();
 
                 const AsmComparisonRecord &record = records[n];
-                if (const AsmInstructionPair *instructionPair = std::get_if<AsmInstructionPair>(&record))
-                {
-                    // #TODO: Make strictness configurable.
-                    const AsmMatchValueEx matchValue =
-                        instructionPair->mismatch_info.get_match_value_ex(AsmMatchStrictness::Undecided);
+                // #TODO: Make strictness configurable.
+                const AsmMatchValueEx matchValue = record.mismatch_info.get_match_value_ex(AsmMatchStrictness::Undecided);
 
-                    ImU32 color = GetAsmMatchValueColor(matchValue);
-                    color = CreateColor(color, (n % 2 == 0) ? 112 : 128);
+                ImU32 color = GetAsmMatchValueColor(matchValue);
+                color = CreateColor(color, (n % 2 == 0) ? 112 : 128);
 
-                    ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, color);
-                    ImGui::TableNextColumn();
+                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, color);
+                ImGui::TableNextColumn();
 
-                    TextUnformattedCenteredX(AsmMatchValueStringArray[size_t(matchValue)]);
-                }
-                else
-                {
-                    // Add empty column and dummy text to satisfy the clipper.
-                    ImGui::TableNextColumn();
-                    TextUnformatted(" ");
-                }
+                TextUnformattedCenteredX(AsmMatchValueStringArray[size_t(matchValue)]);
             }
         }
     }

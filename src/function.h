@@ -57,25 +57,12 @@ private:
     ZydisFormatterRegisterFunc m_default_print_register;
 };
 
-// Data used within function disassemble step. Is cleared at the end of it.
-class FunctionIntermediate
-{
-public:
-    using Address64ToIndexMap = std::map<Address64T, IndexT>;
-
-    explicit FunctionIntermediate(const FunctionSetup &setup) : m_setup(setup) {}
-
-    const FunctionSetup &m_setup;
-    ExeSymbols m_pseudoSymbols;
-    Address64ToIndexMap m_pseudoSymbolAddressToIndexMap;
-};
-
 // Function disassemble class.
 class Function
 {
     friend class FunctionSetup;
 
-    using Address64ToIndexMap = FunctionIntermediate::Address64ToIndexMap;
+    using Address64ToIndexMap = std::map<Address64T, IndexT>;
 
 public:
     Function() = default;
@@ -93,10 +80,15 @@ public:
 
     Address64T get_begin_address() const { return m_beginAddress; }
     Address64T get_end_address() const { return m_endAddress; }
+
     const std::string &get_source_file_name() const { return m_sourceFileName; }
-    const AsmInstructionVariants &get_instructions() const { return m_instructions; }
-    uint32_t get_instruction_count() const { return m_instructionCount; }
-    uint32_t get_label_count() const { return m_labelCount; }
+
+    const AsmInstructions &get_instructions() const { return m_instructions; }
+
+    // The number of instruction addresses that refer to a symbol or pseudo symbol.
+    uint32_t get_symbol_count() const { return m_symbolCount; }
+
+    const ExeSymbol *get_pseudo_symbol(Address64T address) const;
 
 private:
     const FunctionSetup &get_setup() const;
@@ -162,13 +154,18 @@ private:
         void *user_data);
 
 private:
-    FunctionIntermediate *m_intermediate = nullptr;
+    // Setup used during disassemble step. Is nulled at the end of it.
+    const FunctionSetup *m_setup = nullptr;
+
     Address64T m_beginAddress = 0;
     Address64T m_endAddress = 0;
     std::string m_sourceFileName;
-    AsmInstructionVariants m_instructions;
-    uint32_t m_instructionCount = 0;
-    uint32_t m_labelCount = 0;
+    AsmInstructions m_instructions;
+    ExeSymbols m_pseudoSymbols;
+    Address64ToIndexMap m_pseudoSymbolAddressToIndexMap;
+    uint32_t m_symbolCount = 0;
 };
+
+const ExeSymbol *get_symbol_or_pseudo_symbol(Address64T address, const Executable &executable, const Function &function);
 
 } // namespace unassemblize

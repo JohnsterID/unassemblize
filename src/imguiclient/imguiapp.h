@@ -108,7 +108,6 @@ class ImGuiApp
             const std::vector<AssemblerTableColumn> &columns,
             const AsmInstruction &instruction,
             const AsmMismatchInfo &mismatchInfo = {});
-        static void PrintAsmLabelColumns(const std::vector<AssemblerTableColumn> &columns, const AsmLabel &label);
 
     private:
         static void SetupColumn(AssemblerTableColumn column);
@@ -116,7 +115,6 @@ class ImGuiApp
             AssemblerTableColumn column,
             const AsmInstruction &instruction,
             const AsmMismatchInfo &mismatchInfo);
-        static void PrintAsmLabelColumn(AssemblerTableColumn column, const AsmLabel &label);
 
     private:
         const TextFileContent *m_fileContent;
@@ -320,7 +318,6 @@ private:
     static void PrintAsmInstructionBytes(const AsmInstruction &instruction);
     static void PrintAsmInstructionAddress(const AsmInstruction &instruction);
     static void PrintAsmInstructionAssembler(const AsmInstruction &instruction, const AsmMismatchInfo &mismatchInfo);
-    static void PrintAsmLabel(const AsmLabel &label);
 
     static void ComparisonManagerMatchedFunctionDiffSymbolTable(const AsmComparisonRecords &records);
 

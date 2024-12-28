@@ -23,7 +23,6 @@ class AsmMatcher
     struct LookaheadResult
     {
         AsmMismatchInfo mismatch_info;
-        bool is_label = false; // The lookahead has hit a label.
         bool is_matching = false; // The lookahead is considered a match. It could be a maybe match.
     };
 
@@ -45,8 +44,8 @@ private:
     // its last instruction with the base instruction of the opposite side.
     static LookaheadResult run_lookahead_comparison(
         size_t lookahead_side,
-        AsmInstructionVariants::const_iterator lookahead_base_it,
-        AsmInstructionVariants::const_iterator lookahead_last_it,
+        AsmInstructions::const_iterator lookahead_base_it,
+        AsmInstructions::const_iterator lookahead_last_it,
         const InstructionTextArray &lookahead_last_array,
         const AsmInstruction &opposite_base_instruction,
         const InstructionTextArray &opposite_base_array,
@@ -65,9 +64,7 @@ private:
     static SkipSymbolResult skip_unknown_symbol(const char *str);
     static const char *skip_known_symbol(const char *str);
 
-    static InstructionTextArrays split_instruction_texts(const AsmInstructionVariants &instructions);
-
-    static AsmInstructionVariant s_nullInstructionVariant;
+    static InstructionTextArrays split_instruction_texts(const AsmInstructions &instructions);
 };
 
 } // namespace unassemblize

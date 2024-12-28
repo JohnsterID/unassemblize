@@ -48,7 +48,7 @@ struct AsmInstruction
     {
         address = 0;
         isJump = false;
-        isJumpedTo = false;
+        isSymbol = false;
         isInvalid = false;
         isFirstLine = false;
         jumpLen = 0;
@@ -61,7 +61,7 @@ struct AsmInstruction
     Address64T address; // Position of the instruction within the executable.
     BytesArray bytes;
     bool isJump : 1; // Instruction is a jump.
-    bool isJumpedTo : 1; // Instruction is jumped to or called.
+    bool isSymbol : 1; // Instruction has a symbol at its address. Is jumped to or called.
     bool isInvalid : 1; // Instruction was not read or formatted correctly.
     bool isFirstLine : 1; // This instruction is the first one that corresponds to its line number.
     union
@@ -72,21 +72,11 @@ struct AsmInstruction
     std::string text; // Instruction mnemonics and operands with address symbol substitution. Is not expected empty if valid.
 };
 
-struct AsmLabel
-{
-    std::string label;
-};
-
-struct AsmNull
-{
-};
-
-using AsmInstructionVariant = std::variant<AsmLabel, AsmInstruction, AsmNull>;
-using AsmInstructionVariants = std::vector<AsmInstructionVariant>;
+using AsmInstructions = std::vector<AsmInstruction>;
 
 using InstructionTextArray = SizedArray<std::string_view, size_t, 4>;
 
-// Splits instruction text string to text array.
+// Splits instruction text to array of views.
 // "mov dword ptr[eax], 0x10" becomes {"mov", "dword ptr[eax]", "0x10"}
 InstructionTextArray split_instruction_text(std::string_view text);
 

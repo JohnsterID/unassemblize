@@ -197,15 +197,7 @@ private:
         const MatchedFunctions &matched_functions,
         const NamedFunctionBundles &bundles,
         const FileContentStorage &source_file_storage,
-        MatchBundleType bundle_type,
-        const std::string &output_file,
-        const StringPair &exe_filenames,
-        AsmMatchStrictness match_strictness,
-        uint32_t indent_len,
-        uint32_t asm_len,
-        uint32_t byte_count,
-        uint32_t sourcecode_len,
-        uint32_t sourceline_len);
+        const AsmComparisonOptions &o);
 
     static std::string build_cmp_output_path(
         size_t bundle_idx,

@@ -85,18 +85,14 @@ struct AsmMismatchInfo
 };
 static_assert(sizeof(AsmMismatchInfo) <= 8);
 
-struct AsmLabelPair
+struct AsmComparisonRecord
 {
-    std::array<const AsmLabel *, 2> pair; // A pointer can be null.
-};
+    uint8_t is_symbol() const;
 
-struct AsmInstructionPair
-{
-    std::array<const AsmInstruction *, 2> pair = {}; // A pointer can be null.
+    std::array<const AsmInstruction *, 2> pair = {}; // One pointer can be null.
     AsmMismatchInfo mismatch_info;
 };
 
-using AsmComparisonRecord = std::variant<AsmLabelPair, AsmInstructionPair>;
 using AsmComparisonRecords = std::vector<AsmComparisonRecord>;
 
 AsmMatchStrictness to_asm_match_strictness(std::string_view str);
@@ -120,7 +116,7 @@ struct AsmComparisonResult
     int8_t get_max_similarity_as_int(AsmMatchStrictness strictness) const;
 
     AsmComparisonRecords records;
-    uint32_t label_count = 0;
+    uint32_t symbol_count = 0; // Number of records that contain at least one symbol.
     uint32_t match_count = 0;
     uint32_t maybe_match_count = 0; // Alias maybe mismatch, could be a match or mismatch.
     uint32_t mismatch_count = 0;
@@ -144,6 +140,7 @@ struct NamedFunction
 };
 using NamedFunctions = std::vector<NamedFunction>;
 using NamedFunctionPair = std::array<NamedFunction *, 2>;
+using ConstNamedFunctionPair = std::array<const NamedFunction *, 2>;
 using NamedFunctionsPair = std::array<NamedFunctions *, 2>;
 using ConstNamedFunctionsPair = std::array<const NamedFunctions *, 2>;
 
@@ -211,24 +208,5 @@ enum class MatchBundleType
 };
 
 MatchBundleType to_match_bundle_type(std::string_view str);
-
-struct StringPair
-{
-    std::array<std::string, 2> pair;
-};
-
-inline ConstFunctionPair to_const_function_pair(ConstNamedFunctionsPair named_functions_pair, const MatchedFunction &matched)
-{
-    return ConstFunctionPair{
-        &named_functions_pair[0]->at(matched.named_idx_pair[0]).function,
-        &named_functions_pair[1]->at(matched.named_idx_pair[1]).function};
-}
-
-inline NamedFunctionPair to_named_function_pair(NamedFunctionsPair named_functions_pair, const MatchedFunction &matched)
-{
-    return NamedFunctionPair{
-        &named_functions_pair[0]->at(matched.named_idx_pair[0]),
-        &named_functions_pair[1]->at(matched.named_idx_pair[1])};
-}
 
 } // namespace unassemblize

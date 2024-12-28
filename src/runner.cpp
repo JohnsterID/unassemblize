@@ -23,6 +23,32 @@
 
 namespace unassemblize
 {
+namespace
+{
+inline ConstFunctionPair to_const_function_pair(ConstNamedFunctionsPair named_functions_pair, const MatchedFunction &matched)
+{
+    return ConstFunctionPair{
+        &named_functions_pair[0]->at(matched.named_idx_pair[0]).function,
+        &named_functions_pair[1]->at(matched.named_idx_pair[1]).function};
+}
+
+inline NamedFunctionPair to_named_function_pair(NamedFunctionsPair named_functions_pair, const MatchedFunction &matched)
+{
+    return NamedFunctionPair{
+        &named_functions_pair[0]->at(matched.named_idx_pair[0]),
+        &named_functions_pair[1]->at(matched.named_idx_pair[1])};
+}
+
+inline ConstNamedFunctionPair to_const_named_function_pair(
+    ConstNamedFunctionsPair named_functions_pair,
+    const MatchedFunction &matched)
+{
+    return ConstNamedFunctionPair{
+        &named_functions_pair[0]->at(matched.named_idx_pair[0]),
+        &named_functions_pair[1]->at(matched.named_idx_pair[1])};
+}
+} // namespace
+
 std::unique_ptr<Executable> Runner::load_exe(const LoadExeOptions &o)
 {
     assert(!o.input_file.empty());
@@ -213,10 +239,9 @@ bool Runner::process_asm_output(const AsmOutputOptions &o)
     const FunctionSetup setup(o.executable, o.format);
     Function func;
     func.disassemble(setup, o.start_addr, o.end_addr);
-    const AsmInstructionVariants &instructions = func.get_instructions();
 
     std::string text;
-    AsmPrinter::append_to_string(text, instructions, o.print_indent_len);
+    AsmPrinter::append_to_string(text, o.executable, func, o.print_indent_len);
     fs.write(text.data(), text.size());
 
     return true;
@@ -267,26 +292,12 @@ bool Runner::process_asm_comparison(const AsmComparisonOptions &o)
         const_named_functions_pair,
         o.lookahead_limit);
 
-    StringPair exe_filenames;
-    for (size_t i = 0; i < o.executable_pair.size(); ++i)
-    {
-        exe_filenames.pair[i] = o.executable_pair[i]->get_filename();
-    }
-
     ok = output_comparison_results(
         const_named_functions_pair,
         matched_data.matchedFunctions,
         bundles,
         source_file_storage,
-        o.bundle_type,
-        o.output_file,
-        exe_filenames,
-        o.match_strictness,
-        o.print_indent_len,
-        o.print_asm_len,
-        o.print_byte_count,
-        o.print_sourcecode_len,
-        o.print_sourceline_len);
+        o);
 
     return ok;
 }
@@ -836,22 +847,14 @@ bool Runner::output_comparison_results(
     const MatchedFunctions &matched_functions,
     const NamedFunctionBundles &bundles,
     const FileContentStorage &source_file_storage,
-    MatchBundleType bundle_type,
-    const std::string &output_file,
-    const StringPair &exe_filenames,
-    AsmMatchStrictness match_strictness,
-    uint32_t indent_len,
-    uint32_t asm_len,
-    uint32_t byte_count,
-    uint32_t sourcecode_len,
-    uint32_t sourceline_len)
+    const AsmComparisonOptions &o)
 {
     size_t file_write_count = 0;
     size_t bundle_idx = 0;
 
     for (const NamedFunctionBundle &bundle : bundles)
     {
-        std::string output_file_variant = build_cmp_output_path(bundle_idx, bundle.name, output_file);
+        std::string output_file_variant = build_cmp_output_path(bundle_idx, bundle.name, o.output_file);
 
         std::ofstream fs(output_file_variant, std::ofstream::binary);
         if (fs.is_open())
@@ -863,9 +866,9 @@ bool Runner::output_comparison_results(
             for (IndexT i : bundle.matchedFunctionIndices)
             {
                 const MatchedFunction &matched = matched_functions[i];
-                ConstFunctionPair function_pair = to_const_function_pair(named_functions_pair, matched);
-                const std::string &source_file0 = function_pair[0]->get_source_file_name();
-                const std::string &source_file1 = function_pair[1]->get_source_file_name();
+                ConstNamedFunctionPair named_function_pair = to_const_named_function_pair(named_functions_pair, matched);
+                const std::string &source_file0 = named_function_pair[0]->function.get_source_file_name();
+                const std::string &source_file1 = named_function_pair[1]->function.get_source_file_name();
 
                 TextFileContentPair source_file_texts;
                 source_file_texts.pair[0] = source_file_storage.find_content(source_file0);
@@ -875,14 +878,15 @@ bool Runner::output_comparison_results(
                 printer.append_to_string(
                     text,
                     matched.comparison,
-                    exe_filenames,
+                    named_function_pair,
+                    o.executable_pair,
                     source_file_texts,
-                    match_strictness,
-                    indent_len,
-                    asm_len,
-                    byte_count,
-                    sourcecode_len,
-                    sourceline_len);
+                    o.match_strictness,
+                    o.print_indent_len,
+                    o.print_asm_len,
+                    o.print_byte_count,
+                    o.print_sourcecode_len,
+                    o.print_sourceline_len);
 
                 fs.write(text.data(), text.size());
             }

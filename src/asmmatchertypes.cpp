@@ -80,6 +80,17 @@ bool AsmMismatchInfo::is_maybe_mismatch() const
     return is_maybe_match();
 }
 
+uint8_t AsmComparisonRecord::is_symbol() const
+{
+    uint8_t bits = 0;
+    for (int i = 0; i < 2; ++i)
+    {
+        if (pair[i] != nullptr && pair[i]->isSymbol)
+            bits |= (1 << i);
+    }
+    return bits;
+}
+
 AsmMatchStrictness to_asm_match_strictness(std::string_view str)
 {
     if (util::equals_nocase(str, "lenient"))
@@ -103,7 +114,7 @@ AsmMatchStrictness to_asm_match_strictness(std::string_view str)
 
 uint32_t AsmComparisonResult::get_instruction_count() const
 {
-    return match_count + maybe_match_count + mismatch_count;
+    return static_cast<uint32_t>(records.size());
 }
 
 uint32_t AsmComparisonResult::get_match_count(AsmMatchStrictness strictness) const
@@ -184,7 +195,7 @@ int8_t AsmComparisonResult::get_max_similarity_as_int(AsmMatchStrictness strictn
 
 bool NamedFunction::is_disassembled() const
 {
-    return function.get_instruction_count() != 0;
+    return !function.get_instructions().empty();
 }
 
 TriState NamedFunction::is_linked_to_source_file() const
