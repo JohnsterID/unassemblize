@@ -200,7 +200,7 @@ struct ProgramComparisonDescriptor
 
     span<const IndexT> get_matched_named_function_indices_for_processing(
         span<const IndexT> matchedFunctionIndices,
-        IndexT side);
+        Side side);
 
     int get_functions_page_count() const;
     FunctionsPageData get_selected_functions_page_data() const;
@@ -237,7 +237,7 @@ private:
     static std::vector<IndexT> build_named_function_indices(
         const MatchedFunctions &matchedFunctions,
         span<const IndexT> matchedFunctionIndices,
-        IndexT side);
+        Side side);
 
     static ProgramComparisonId s_id;
 };

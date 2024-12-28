@@ -57,16 +57,16 @@ private:
         Buffers &buffers,
         const AsmComparisonRecords &records,
         const TextFileContent &source_file_text,
-        size_t side_idx,
+        Side side,
         uint32_t sourcecode_len,
         uint32_t sourceline_len);
-    static void append_bytes(Buffers &buffers, const AsmComparisonRecords &records, size_t side_idx, uint32_t byte_count);
+    static void append_bytes(Buffers &buffers, const AsmComparisonRecords &records, Side side, uint32_t byte_count);
     static void append_assembler(
         Buffers &buffers,
         const AsmComparisonRecords &records,
         const Executable &executable,
         const Function &function,
-        size_t side_idx,
+        Side side,
         uint32_t asm_len,
         uint32_t indent_len);
     static void append_comparison(

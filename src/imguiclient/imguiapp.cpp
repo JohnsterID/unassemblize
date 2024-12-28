@@ -1032,9 +1032,9 @@ void ImGuiApp::process_named_and_matched_functions_async(
 
     std::array<span<const IndexT>, 2> namedFunctionIndicesArray;
     namedFunctionIndicesArray[0] =
-        comparisonDescriptor->get_matched_named_function_indices_for_processing(matchedFunctionIndices, 0);
+        comparisonDescriptor->get_matched_named_function_indices_for_processing(matchedFunctionIndices, LeftSide);
     namedFunctionIndicesArray[1] =
-        comparisonDescriptor->get_matched_named_function_indices_for_processing(matchedFunctionIndices, 1);
+        comparisonDescriptor->get_matched_named_function_indices_for_processing(matchedFunctionIndices, RightSide);
 
     int namedFunctionsCount = 0;
     for (IndexT i = 0; i < 2; ++i)

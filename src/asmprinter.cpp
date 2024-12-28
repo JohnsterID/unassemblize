@@ -133,55 +133,67 @@ void AsmPrinter::append_to_string(
     {
         // Create assembler lines in vector.
         const uint32_t source_len = sourcecode_len + sourceline_len;
-        size_t i = 0;
+        Side side = LeftSide;
 
-        if (source_len > 0 && source_file_texts.pair[i] != nullptr)
+        if (source_len > 0 && source_file_texts.pair[side] != nullptr)
         {
-            source_code_regions[i].begin = m_buffers.lines[0].size();
-            append_source_code(m_buffers, comparison.records, *source_file_texts.pair[i], i, sourcecode_len, sourceline_len);
-            source_code_regions[i].end = m_buffers.lines[0].size();
+            source_code_regions[side].begin = m_buffers.lines[0].size();
+            append_source_code(
+                m_buffers,
+                comparison.records,
+                *source_file_texts.pair[side],
+                side,
+                sourcecode_len,
+                sourceline_len);
+            source_code_regions[side].end = m_buffers.lines[0].size();
         }
 
         if (byte_count > 0)
         {
-            append_bytes(m_buffers, comparison.records, i, byte_count);
+            append_bytes(m_buffers, comparison.records, side, byte_count);
         }
 
-        assembler_regions[i].begin = m_buffers.lines[0].size();
+        assembler_regions[side].begin = m_buffers.lines[0].size();
         append_assembler(
             m_buffers,
             comparison.records,
-            *executable_pair[i],
-            named_function_pair[i]->function,
-            i,
+            *executable_pair[side],
+            named_function_pair[side]->function,
+            side,
             asm_len,
             indent_len);
-        assembler_regions[i].end = m_buffers.lines[0].size();
+        assembler_regions[side].end = m_buffers.lines[0].size();
 
         append_comparison(m_buffers, comparison.records, match_strictness);
-        ++i;
+        side = RightSide;
 
-        assembler_regions[i].begin = m_buffers.lines[0].size();
+        assembler_regions[side].begin = m_buffers.lines[0].size();
         append_assembler(
             m_buffers,
             comparison.records,
-            *executable_pair[i],
-            named_function_pair[i]->function,
-            i,
+            *executable_pair[side],
+            named_function_pair[side]->function,
+            side,
             asm_len,
             indent_len);
-        assembler_regions[i].end = m_buffers.lines[0].size();
+        assembler_regions[side].end = m_buffers.lines[0].size();
 
         if (byte_count > 0)
         {
-            append_bytes(m_buffers, comparison.records, i, byte_count);
+            append_bytes(m_buffers, comparison.records, side, byte_count);
         }
 
-        if (source_len > 0 && source_file_texts.pair[i] != nullptr)
+        if (source_len > 0 && source_file_texts.pair[side] != nullptr)
         {
-            source_code_regions[i].begin = m_buffers.lines[0].size();
-            append_source_code(m_buffers, comparison.records, *source_file_texts.pair[i], i, sourcecode_len, sourceline_len);
-            source_code_regions[i].end = m_buffers.lines[0].size();
+            source_code_regions[side].begin = m_buffers.lines[0].size();
+            append_source_code(
+                m_buffers,
+                comparison.records,
+                *source_file_texts.pair[side],
+                side,
+                sourcecode_len,
+                sourceline_len);
+            source_code_regions[side].end = m_buffers.lines[0].size();
         }
     }
 
@@ -286,7 +298,7 @@ void AsmPrinter::append_source_code(
     Buffers &buffers,
     const AsmComparisonRecords &records,
     const TextFileContent &source_file_text,
-    size_t side_idx,
+    Side side,
     uint32_t sourcecode_len,
     uint32_t sourceline_len)
 {
@@ -309,7 +321,7 @@ void AsmPrinter::append_source_code(
 
         std::string &line = buffers.lines[line_idx];
         const size_t offset = line.size();
-        const AsmInstruction *instruction = record.pair[side_idx];
+        const AsmInstruction *instruction = record.pair[side];
         if (instruction != nullptr)
         {
             const uint16_t line_idx = instruction->get_line_index();
@@ -337,7 +349,7 @@ void AsmPrinter::append_source_code(
     assert(line_idx == buffers.lines.size());
 }
 
-void AsmPrinter::append_bytes(Buffers &buffers, const AsmComparisonRecords &records, size_t side_idx, uint32_t byte_count)
+void AsmPrinter::append_bytes(Buffers &buffers, const AsmComparisonRecords &records, Side side, uint32_t byte_count)
 {
     byte_count = std::min<uint32_t>(byte_count, AsmInstruction::BytesArray::MaxSize);
     const size_t bytes_len = byte_count * (2 + 1);
@@ -357,7 +369,7 @@ void AsmPrinter::append_bytes(Buffers &buffers, const AsmComparisonRecords &reco
 
         std::string &line = buffers.lines[line_idx];
         const size_t offset = line.size();
-        const AsmInstruction *instruction = record.pair[side_idx];
+        const AsmInstruction *instruction = record.pair[side];
         if (instruction != nullptr)
         {
             const size_t usable_byte_count = std::min<size_t>(byte_count, instruction->bytes.size());
@@ -378,7 +390,7 @@ void AsmPrinter::append_assembler(
     const AsmComparisonRecords &records,
     const Executable &executable,
     const Function &function,
-    size_t side_idx,
+    Side side,
     uint32_t asm_len,
     uint32_t indent_len)
 {
@@ -391,7 +403,7 @@ void AsmPrinter::append_assembler(
 
     for (const AsmComparisonRecord &record : records)
     {
-        const AsmInstruction *instruction = record.pair[side_idx];
+        const AsmInstruction *instruction = record.pair[side];
 
         // Label Row
 

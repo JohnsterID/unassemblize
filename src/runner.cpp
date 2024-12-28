@@ -366,10 +366,10 @@ NamedFunctions Runner::build_functions(const Executable &executable)
 
 MatchedFunctionsData Runner::build_matched_functions(ConstNamedFunctionsPair named_functions_pair)
 {
-    const IndexT less_idx = named_functions_pair[0]->size() < named_functions_pair[1]->size() ? 0 : 1;
-    const IndexT more_idx = (less_idx + 1) % 2;
-    const NamedFunctions &less_named_functions = *named_functions_pair[less_idx];
-    const NamedFunctions &more_named_functions = *named_functions_pair[more_idx];
+    const Side less_side = named_functions_pair[0]->size() < named_functions_pair[1]->size() ? LeftSide : RightSide;
+    const Side more_side = get_opposite_side(less_side);
+    const NamedFunctions &less_named_functions = *named_functions_pair[less_side];
+    const NamedFunctions &more_named_functions = *named_functions_pair[more_side];
     const MultiStringToIndexMapT less_named_functions_to_index_map = build_function_name_to_index_map(less_named_functions);
     const MultiStringToIndexMapT more_named_functions_to_index_map = build_function_name_to_index_map(more_named_functions);
     const size_t less_named_size = less_named_functions.size();
@@ -377,8 +377,8 @@ MatchedFunctionsData Runner::build_matched_functions(ConstNamedFunctionsPair nam
 
     MatchedFunctionsData result;
     result.matchedFunctions.reserve(more_named_size);
-    NamedFunctionMatchInfos &lessNamedFunctionMatchInfos = result.namedFunctionMatchInfosArray[less_idx];
-    NamedFunctionMatchInfos &moreNamedFunctionMatchInfos = result.namedFunctionMatchInfosArray[more_idx];
+    NamedFunctionMatchInfos &lessNamedFunctionMatchInfos = result.namedFunctionMatchInfosArray[less_side];
+    NamedFunctionMatchInfos &moreNamedFunctionMatchInfos = result.namedFunctionMatchInfosArray[more_side];
     lessNamedFunctionMatchInfos.resize(less_named_size);
     moreNamedFunctionMatchInfos.resize(more_named_size);
 
@@ -403,8 +403,8 @@ MatchedFunctionsData Runner::build_matched_functions(ConstNamedFunctionsPair nam
         const IndexT matched_index = result.matchedFunctions.size();
         result.matchedFunctions.emplace_back();
         MatchedFunction &matched = result.matchedFunctions.back();
-        matched.named_idx_pair[less_idx] = less_named_idx;
-        matched.named_idx_pair[more_idx] = more_pair.first->second;
+        matched.named_idx_pair[less_side] = less_named_idx;
+        matched.named_idx_pair[more_side] = more_pair.first->second;
 
         lessNamedFunctionMatchInfos[less_named_idx].matched_index = matched_index;
         moreNamedFunctionMatchInfos[more_pair.first->second].matched_index = matched_index;

@@ -209,4 +209,15 @@ enum class MatchBundleType
 
 MatchBundleType to_match_bundle_type(std::string_view str);
 
+enum Side : uint8_t
+{
+    LeftSide = 0,
+    RightSide = 1,
+};
+
+inline Side get_opposite_side(Side side)
+{
+    return static_cast<Side>((side + 1) % 2);
+}
+
 } // namespace unassemblize

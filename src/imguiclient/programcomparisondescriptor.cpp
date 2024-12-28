@@ -588,12 +588,12 @@ void ProgramComparisonDescriptor::update_selected_matched_functions()
         selectedMatchedFunctionIndices.reserve(size);
     }
 
-    const IndexT lessIdx = selected0.size() < selected1.size() ? 0 : 1;
-    const IndexT moreIdx = (lessIdx + 1) % 2;
+    const Side lessSide = selected0.size() < selected1.size() ? LeftSide : RightSide;
+    const Side moreSide = get_opposite_side(lessSide);
 
-    for (IndexT functionIndex : m_files[moreIdx].m_selectedNamedFunctionIndices)
+    for (IndexT functionIndex : m_files[moreSide].m_selectedNamedFunctionIndices)
     {
-        const NamedFunctionMatchInfo &matchInfo = m_files[moreIdx].m_namedFunctionMatchInfos[functionIndex];
+        const NamedFunctionMatchInfo &matchInfo = m_files[moreSide].m_namedFunctionMatchInfos[functionIndex];
         if (matchInfo.is_matched())
         {
             selectedMatchedFunctionIndices.push_back(matchInfo.matched_index);
@@ -605,9 +605,9 @@ void ProgramComparisonDescriptor::update_selected_matched_functions()
         selectedMatchedFunctionIndices.begin(),
         selectedMatchedFunctionIndices.end());
 
-    for (IndexT functionIndex : m_files[lessIdx].m_selectedNamedFunctionIndices)
+    for (IndexT functionIndex : m_files[lessSide].m_selectedNamedFunctionIndices)
     {
-        const NamedFunctionMatchInfo &matchInfo = m_files[lessIdx].m_namedFunctionMatchInfos[functionIndex];
+        const NamedFunctionMatchInfo &matchInfo = m_files[lessSide].m_namedFunctionMatchInfos[functionIndex];
         if (matchInfo.is_matched())
         {
             if (priorSelectedMatchedFunctionIndicesSet.count(matchInfo.matched_index) != 0)
@@ -720,7 +720,7 @@ const ProgramComparisonDescriptor::File::NamedFunctionUiInfo *ProgramComparisonD
 
 span<const IndexT> ProgramComparisonDescriptor::get_matched_named_function_indices_for_processing(
     span<const IndexT> matchedFunctionIndices,
-    IndexT side)
+    Side side)
 {
     const std::vector<IndexT> matchedNamedFunctionIndices =
         build_named_function_indices(m_matchedFunctions, matchedFunctionIndices, side);
@@ -864,7 +864,7 @@ ProgramComparisonDescriptor::FunctionsPageData ProgramComparisonDescriptor::get_
 std::vector<IndexT> ProgramComparisonDescriptor::build_named_function_indices(
     const MatchedFunctions &matchedFunctions,
     span<const IndexT> matchedFunctionIndices,
-    IndexT side)
+    Side side)
 {
     const size_t count = matchedFunctionIndices.size();
     std::vector<IndexT> namedFunctionIndices(count);

@@ -82,12 +82,6 @@ class ImGuiApp
 
     using ProgramFileDescriptorPair = std::array<ProgramFileDescriptor *, 2>;
 
-    enum Side : uint8_t
-    {
-        LeftSide = 0,
-        RightSide = 1,
-    };
-
     enum class AssemblerTableColumn : uint8_t
     {
         SourceLine,

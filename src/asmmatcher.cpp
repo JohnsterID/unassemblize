@@ -88,7 +88,7 @@ AsmComparisonResult AsmMatcher::run_comparison(ConstFunctionPair function_pair, 
                         AsmInstructions::const_iterator lookahead_last_it = lookahead_base_it + k0;
                         const InstructionTextArray &lookahead_last_array = arrays0[i0 + k0];
                         LookaheadResult lookahead_result = run_lookahead_comparison(
-                            0,
+                            LeftSide,
                             lookahead_base_it,
                             lookahead_last_it,
                             lookahead_last_array,
@@ -115,7 +115,7 @@ AsmComparisonResult AsmMatcher::run_comparison(ConstFunctionPair function_pair, 
                         AsmInstructions::const_iterator lookahead_last_it = lookahead_base_it + k1;
                         const InstructionTextArray &lookahead_last_array = arrays1[i1 + k1];
                         LookaheadResult lookahead_result = run_lookahead_comparison(
-                            1,
+                            RightSide,
                             lookahead_base_it,
                             lookahead_last_it,
                             lookahead_last_array,
@@ -182,7 +182,7 @@ AsmComparisonResult AsmMatcher::run_comparison(ConstFunctionPair function_pair, 
 }
 
 AsmMatcher::LookaheadResult AsmMatcher::run_lookahead_comparison(
-    size_t lookahead_side,
+    Side lookahead_side,
     AsmInstructions::const_iterator lookahead_base_it,
     AsmInstructions::const_iterator lookahead_last_it,
     const InstructionTextArray &lookahead_last_array,
@@ -190,10 +190,9 @@ AsmMatcher::LookaheadResult AsmMatcher::run_lookahead_comparison(
     const InstructionTextArray &opposite_base_array,
     AsmComparisonResult &comparison)
 {
-    assert(lookahead_side < 2);
     assert(lookahead_base_it < lookahead_last_it);
 
-    const size_t opposite_side = (lookahead_side + 1) % 2;
+    const Side opposite_side = get_opposite_side(lookahead_side);
     const AsmInstruction &lookahead_last_instruction = *lookahead_last_it;
 
     LookaheadResult lookahead_result;

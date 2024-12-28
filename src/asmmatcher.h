@@ -43,7 +43,7 @@ private:
     // Looks ahead one side of the instruction list and compares
     // its last instruction with the base instruction of the opposite side.
     static LookaheadResult run_lookahead_comparison(
-        size_t lookahead_side,
+        Side lookahead_side,
         AsmInstructions::const_iterator lookahead_base_it,
         AsmInstructions::const_iterator lookahead_last_it,
         const InstructionTextArray &lookahead_last_array,
