@@ -88,6 +88,8 @@ public:
     // The number of instruction addresses that refer to a symbol or pseudo symbol.
     uint32_t get_symbol_count() const { return m_symbolCount; }
 
+    const AsmJumpDestinationInfo *get_jump_destination_info(Address64T address) const;
+
     const ExeSymbol *get_pseudo_symbol(Address64T address) const;
 
 private:
@@ -100,6 +102,8 @@ private:
     ZydisFormatterFunc get_default_format_operand_mem() const;
     ZydisFormatterFunc get_default_format_operand_ptr() const;
     ZydisFormatterRegisterFunc get_default_print_register() const;
+
+    void add_jump_destination(Address64T jumpDestination, Address64T jumpOrigin);
 
     bool add_pseudo_symbol(Address64T address, std::string_view prefix);
     const ExeSymbol *get_symbol(Address64T address) const;
@@ -161,8 +165,13 @@ private:
     Address64T m_endAddress = 0;
     std::string m_sourceFileName;
     AsmInstructions m_instructions;
+
+    AsmJumpDestinationInfos m_jumpDestinationInfos;
+    Address64ToIndexMap m_jumpDestinationAddressToIndexMap;
+
     ExeSymbols m_pseudoSymbols;
     Address64ToIndexMap m_pseudoSymbolAddressToIndexMap;
+
     uint32_t m_symbolCount = 0;
 };
 

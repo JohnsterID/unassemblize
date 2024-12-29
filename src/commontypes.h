@@ -80,7 +80,14 @@ TargetType down_cast(SourceType value)
 {
     static_assert(sizeof(TargetType) < sizeof(SourceType), "Expects smaller target type");
 
-    assert(value < (SourceType(1) << sizeof(TargetType) * 8));
+    if constexpr (std::is_signed_v<TargetType>)
+    {
+        assert(std::abs(value) < (SourceType(1) << sizeof(TargetType) * 8) / 2);
+    }
+    else
+    {
+        assert(value < (SourceType(1) << sizeof(TargetType) * 8));
+    }
 
     return static_cast<TargetType>(value);
 }

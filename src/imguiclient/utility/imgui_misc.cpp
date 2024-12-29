@@ -178,12 +178,52 @@ ImU32 ImAlphaBlendColors(ImU32 col_a, ImU32 col_b)
 void DrawInTextCircle(ImU32 color)
 {
     const ImVec2 pos = ImGui::GetCursorScreenPos();
-    const ImVec2 font_size = ImGui::CalcTextSize("a");
-    const float x_radius = font_size.x * 0.5f;
-    const float y_radius = font_size.y * 0.5f;
+    const ImVec2 font_size = CalcTextSize("a");
+    const float r = font_size.x * 0.5f;
+    const ImVec2 center = pos + ImVec2(r, font_size.y * 0.5f);
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
-    draw_list->AddCircleFilled(ImVec2(pos.x + x_radius, pos.y + y_radius), x_radius, color, 0);
+    draw_list->AddCircleFilled(center, r, color, 0);
     ImGui::SetCursorScreenPos(ImVec2(pos.x + font_size.x, pos.y));
+}
+
+void DrawInTextTriangle(ImU32 color, ImGuiDir dir)
+{
+    const ImVec2 pos = ImGui::GetCursorScreenPos();
+    const ImVec2 font_size = ImGui::CalcTextSize("a");
+    const float r = font_size.x * 0.5f;
+    const ImVec2 center = pos + ImVec2(r, font_size.y * 0.5f);
+    ImDrawList *draw_list = ImGui::GetWindowDrawList();
+    DrawTriangle(draw_list, center, r, color, dir);
+    ImGui::SetCursorScreenPos(ImVec2(pos.x + font_size.x, pos.y));
+}
+
+void DrawTriangle(ImDrawList *draw_list, ImVec2 center, float r, ImU32 color, ImGuiDir dir)
+{
+    ImVec2 a, b, c;
+    switch (dir)
+    {
+        case ImGuiDir_Up:
+        case ImGuiDir_Down:
+            if (dir == ImGuiDir_Up)
+                r = -r;
+            a = ImVec2(+0.000f, +0.750f) * r;
+            b = ImVec2(-0.866f, -0.750f) * r;
+            c = ImVec2(+0.866f, -0.750f) * r;
+            break;
+        case ImGuiDir_Left:
+        case ImGuiDir_Right:
+            if (dir == ImGuiDir_Left)
+                r = -r;
+            a = ImVec2(+0.750f, +0.000f) * r;
+            b = ImVec2(-0.750f, +0.866f) * r;
+            c = ImVec2(-0.750f, -0.866f) * r;
+            break;
+        case ImGuiDir_None:
+        case ImGuiDir_COUNT:
+            IM_ASSERT(0);
+            break;
+    }
+    draw_list->AddTriangleFilled(center + a, center + b, center + c, color);
 }
 
 void DrawTextBackgroundColor(std::string_view view, ImU32 color, const ImVec2 &pos)

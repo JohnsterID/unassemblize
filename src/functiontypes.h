@@ -14,6 +14,7 @@
 
 #include "commontypes.h"
 #include <array>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -57,6 +58,7 @@ struct AsmInstruction
 
     void set_bytes(const uint8_t *p, size_t size);
     uint16_t get_line_index() const { return lineNumber - 1; } // Returns ~0 when invalid
+    bool operator<(Address64T a) const { return address < a; }
 
     Address64T address; // Position of the instruction within the executable.
     BytesArray bytes;
@@ -66,7 +68,7 @@ struct AsmInstruction
     bool isFirstLine : 1; // This instruction is the first one that corresponds to its line number.
     union
     {
-        int16_t jumpLen; // Jump length in bytes.
+        int32_t jumpLen; // Jump length in bytes.
     };
     uint16_t lineNumber; // Line number in the source file - if exists.
     std::string text; // Instruction mnemonics and operands with address symbol substitution. Is not expected empty if valid.
@@ -74,10 +76,23 @@ struct AsmInstruction
 
 using AsmInstructions = std::vector<AsmInstruction>;
 
+std::optional<ptrdiff_t> get_instruction_distance(
+    const AsmInstructions &instructions,
+    Address64T address1,
+    Address64T address2);
+
 using InstructionTextArray = SizedArray<std::string_view, size_t, 4>;
 
 // Splits instruction text to array of views.
 // "mov dword ptr[eax], 0x10" becomes {"mov", "dword ptr[eax]", "0x10"}
 InstructionTextArray split_instruction_text(std::string_view text);
+
+struct AsmJumpDestinationInfo
+{
+    Address64T jumpDestination;
+    std::vector<Address64T> jumpOrigins;
+};
+
+using AsmJumpDestinationInfos = std::vector<AsmJumpDestinationInfo>;
 
 } // namespace unassemblize

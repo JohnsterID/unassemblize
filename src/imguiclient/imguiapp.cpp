@@ -22,8 +22,20 @@
 
 namespace unassemblize::gui
 {
-ImGuiApp::AssemblerTableColumnsDrawer::AssemblerTableColumnsDrawer(const TextFileContent *fileContent) :
-    m_fileContent(fileContent)
+ImGuiApp::AssemblerTableColumnsDrawer::AssemblerTableColumnsDrawer(
+    const NamedFunction &namedFunction,
+    const TextFileContent *fileContent,
+    const AsmInstructions *instructions) :
+    m_namedFunction(namedFunction), m_fileContent(fileContent), m_instructionSource(instructions)
+{
+}
+
+ImGuiApp::AssemblerTableColumnsDrawer::AssemblerTableColumnsDrawer(
+    const NamedFunction &namedFunction,
+    const TextFileContent *fileContent,
+    const AsmComparisonRecords *records,
+    Side side) :
+    m_namedFunction(namedFunction), m_fileContent(fileContent), m_instructionSource(records), m_side(side)
 {
 }
 
@@ -63,6 +75,9 @@ void ImGuiApp::AssemblerTableColumnsDrawer::SetupColumn(AssemblerTableColumn col
         case AssemblerTableColumn::Address:
             ImGui::TableSetupColumn("Address");
             break;
+        case AssemblerTableColumn::Jumps:
+            ImGui::TableSetupColumn("Jumps", ImGuiTableColumnFlags_DefaultHide);
+            break;
         case AssemblerTableColumn::Assembler:
             ImGui::TableSetupColumn("Assembler");
             break;
@@ -94,9 +109,104 @@ void ImGuiApp::AssemblerTableColumnsDrawer::PrintAsmInstructionColumn(
         case AssemblerTableColumn::Address:
             ImGuiApp::PrintAsmInstructionAddress(instruction);
             break;
+        case AssemblerTableColumn::Jumps:
+            PrintAsmJumpLines(instruction);
+            break;
         case AssemblerTableColumn::Assembler:
             ImGuiApp::PrintAsmInstructionAssembler(instruction, mismatchInfo);
             break;
+    }
+}
+
+void ImGuiApp::AssemblerTableColumnsDrawer::PrintAsmJumpLines(const AsmInstruction &instruction)
+{
+    const ImVec2 screenPos = ImGui::GetCursorScreenPos();
+
+    const AsmJumpDestinationInfo *destinationInfo = m_namedFunction.function.get_jump_destination_info(instruction.address);
+    if (destinationInfo != nullptr)
+    {
+        // This instruction address is jumped to.
+
+        for (Address64T originAddress : destinationInfo->jumpOrigins)
+        {
+            AddressSet::const_iterator it = m_drawnJumpOrigins.find(originAddress);
+            if (it == m_drawnJumpOrigins.end())
+            {
+                Address64T targetAddress = instruction.address;
+                const std::optional<ptrdiff_t> distance = GetDistance(originAddress, targetAddress);
+                assert(distance.has_value());
+
+                AddAsmJumpLine(screenPos, distance.value(), false);
+                m_drawnJumpOrigins.emplace(originAddress);
+            }
+        }
+    }
+
+    if (instruction.isJump)
+    {
+        // This instruction jumps elsewhere.
+
+        const Address64T originAddress = instruction.address;
+
+        AddressSet::const_iterator it = m_drawnJumpOrigins.find(originAddress);
+        if (it == m_drawnJumpOrigins.end())
+        {
+            const Address64T targetAddress = instruction.address + instruction.jumpLen;
+            const std::optional<ptrdiff_t> distance = GetDistance(originAddress, targetAddress);
+            assert(distance.has_value());
+
+            AddAsmJumpLine(screenPos, distance.value(), true);
+            m_drawnJumpOrigins.emplace(originAddress);
+        }
+    }
+}
+
+void ImGuiApp::AssemblerTableColumnsDrawer::AddAsmJumpLine(ImVec2 screenPos, ptrdiff_t distance, bool cursorPosIsOrigin)
+{
+    const float lineHeight = ImGui::GetTextLineHeightWithSpacing();
+    const ImVec2 fontSize = ImGui::CalcTextSize("0");
+    const ImVec2 pos = ImVec2(screenPos.x + fontSize.x * m_drawnJumpOrigins.size(), screenPos.y);
+    const float r = fontSize.x * 0.5f;
+
+    ImVec2 targetCenter;
+    ImVec2 originCenter;
+    if (cursorPosIsOrigin)
+    {
+        originCenter = pos + ImVec2(r, fontSize.y * 0.5f);
+        targetCenter = originCenter + ImVec2(0, distance * lineHeight);
+    }
+    else // cursor pos is target
+    {
+        targetCenter = pos + ImVec2(r, fontSize.y * 0.5f);
+        originCenter = targetCenter + ImVec2(0, -distance * lineHeight);
+    }
+    const ImColor hsv = ImColor::HSV((float)distance * 0.13f, 0.6f, 1.0f);
+    const ImU32 color = ImGui::GetColorU32(hsv.Value);
+    const ImGuiDir dir = (targetCenter.y > originCenter.y) ? ImGuiDir_Down : ImGuiDir_Up;
+
+    ImDrawList *drawList = ImGui::GetWindowDrawList();
+    drawList->AddCircleFilled(originCenter, r, color, 0);
+    drawList->AddLine(
+        ImVec2(std::floorf(originCenter.x), originCenter.y),
+        ImVec2(std::floorf(targetCenter.x), targetCenter.y),
+        color,
+        1.0f);
+    DrawTriangle(drawList, targetCenter, r, color, dir);
+
+    ImGui::SetCursorScreenPos(ImVec2(pos.x + fontSize.x, pos.y));
+}
+
+std::optional<ptrdiff_t> ImGuiApp::AssemblerTableColumnsDrawer::GetDistance(Address64T address1, Address64T address2)
+{
+    if (std::holds_alternative<const AsmInstructions *>(m_instructionSource))
+    {
+        const AsmInstructions *instructions = std::get<const AsmInstructions *>(m_instructionSource);
+        return get_instruction_distance(*instructions, address1, address2);
+    }
+    else
+    {
+        const AsmComparisonRecords *records = std::get<const AsmComparisonRecords *>(m_instructionSource);
+        return get_record_distance(*records, m_side, address1, address2);
     }
 }
 
@@ -107,10 +217,12 @@ const std::vector<ImGuiApp::AssemblerTableColumn> ImGuiApp::s_assemblerTableColu
     AssemblerTableColumn::SourceCode,
     AssemblerTableColumn::Bytes,
     AssemblerTableColumn::Address,
+    AssemblerTableColumn::Jumps,
     AssemblerTableColumn::Assembler};
 
 const std::vector<ImGuiApp::AssemblerTableColumn> ImGuiApp::s_assemblerTableColumnsRight = {
     AssemblerTableColumn::Address,
+    AssemblerTableColumn::Jumps,
     AssemblerTableColumn::Assembler,
     AssemblerTableColumn::Bytes,
     AssemblerTableColumn::SourceLine,
@@ -119,10 +231,12 @@ const std::vector<ImGuiApp::AssemblerTableColumn> ImGuiApp::s_assemblerTableColu
 const std::vector<ImGuiApp::AssemblerTableColumn> ImGuiApp::s_assemblerTableColumnsLeft_NoSource = {
     AssemblerTableColumn::Bytes,
     AssemblerTableColumn::Address,
+    AssemblerTableColumn::Jumps,
     AssemblerTableColumn::Assembler};
 
 const std::vector<ImGuiApp::AssemblerTableColumn> ImGuiApp::s_assemblerTableColumnsRight_NoSource = {
     AssemblerTableColumn::Address,
+    AssemblerTableColumn::Jumps,
     AssemblerTableColumn::Assembler,
     AssemblerTableColumn::Bytes,
 };
@@ -2832,7 +2946,7 @@ void ImGuiApp::ComparisonManagerMatchedFunctionContentTable(
     const TextFileContent *fileContent = fileRevision.m_fileContentStorage.find_content(sourceFile);
     const bool showSourceCodeColumns = fileContent != nullptr;
     const std::vector<AssemblerTableColumn> &assemblerTableColumns = GetAssemblerTableColumns(side, showSourceCodeColumns);
-    AssemblerTableColumnsDrawer columnsDrawer(fileContent);
+    AssemblerTableColumnsDrawer columnsDrawer(namedFunction, fileContent, &records, side);
 
     const ImVec2 tableSize(0.0f, GetMaxTableHeight(records.size()));
     ImScoped::Table table("##function_assembler_table", assemblerTableColumns.size(), AssemblerTableFlags, tableSize);
@@ -2972,7 +3086,7 @@ void ImGuiApp::ComparisonManagerNamedFunctionContentTable(
     const TextFileContent *fileContent = fileRevision.m_fileContentStorage.find_content(sourceFile);
     const bool showSourceCodeColumns = fileContent != nullptr;
     const std::vector<AssemblerTableColumn> &assemblerTableColumns = GetAssemblerTableColumns(side, showSourceCodeColumns);
-    AssemblerTableColumnsDrawer columnsDrawer(fileContent);
+    AssemblerTableColumnsDrawer columnsDrawer(namedFunction, fileContent, &instructions);
 
     ImScoped::Table table(
         "##function_assembler_table",

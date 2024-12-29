@@ -91,6 +91,53 @@ uint8_t AsmComparisonRecord::is_symbol() const
     return bits;
 }
 
+std::optional<ptrdiff_t> get_record_distance(
+    const AsmComparisonRecords &records,
+    Side side,
+    Address64T address1,
+    Address64T address2)
+{
+    // Linear search instead of binary search, because there can be null elements. Expensive.
+
+    AsmComparisonRecords::const_iterator it1 =
+        std::find_if(records.begin(), records.end(), [=](const AsmComparisonRecord &record) {
+            const AsmInstruction *instruction = record.pair[side];
+            if (instruction != nullptr)
+                return instruction->address == address1;
+            return false;
+        });
+
+    if (it1 != records.end())
+    {
+        // Search front or back range depending where address2 is.
+        AsmComparisonRecords::const_iterator begin;
+        AsmComparisonRecords::const_iterator end;
+        if (address1 < address2)
+        {
+            begin = it1;
+            end = records.end();
+        }
+        else
+        {
+            begin = records.begin();
+            end = it1;
+        }
+        AsmComparisonRecords::const_iterator it2 =
+            std::find_if(records.begin(), records.end(), [=](const AsmComparisonRecord &record) {
+                const AsmInstruction *instruction = record.pair[side];
+                if (instruction != nullptr)
+                    return instruction->address == address2;
+                return false;
+            });
+
+        if (it2 != records.end())
+        {
+            return std::distance(it1, it2);
+        }
+    }
+    return std::nullopt;
+}
+
 AsmMatchStrictness to_asm_match_strictness(std::string_view str)
 {
     if (util::equals_nocase(str, "lenient"))

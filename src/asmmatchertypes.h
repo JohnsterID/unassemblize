@@ -20,6 +20,17 @@
 
 namespace unassemblize
 {
+enum Side : uint8_t
+{
+    LeftSide = 0,
+    RightSide = 1,
+};
+
+inline Side get_opposite_side(Side side)
+{
+    return static_cast<Side>((side + 1) % 2);
+}
+
 enum class AsmMatchStrictness
 {
     Lenient, // Unknown to known/unknown symbol pairs are treated as match.
@@ -94,6 +105,12 @@ struct AsmComparisonRecord
 };
 
 using AsmComparisonRecords = std::vector<AsmComparisonRecord>;
+
+std::optional<ptrdiff_t> get_record_distance(
+    const AsmComparisonRecords &records,
+    Side side,
+    Address64T address1,
+    Address64T address2);
 
 AsmMatchStrictness to_asm_match_strictness(std::string_view str);
 
@@ -208,16 +225,5 @@ enum class MatchBundleType
 };
 
 MatchBundleType to_match_bundle_type(std::string_view str);
-
-enum Side : uint8_t
-{
-    LeftSide = 0,
-    RightSide = 1,
-};
-
-inline Side get_opposite_side(Side side)
-{
-    return static_cast<Side>((side + 1) % 2);
-}
 
 } // namespace unassemblize

@@ -772,14 +772,19 @@ void Function::disassemble(const FunctionSetup &setup)
         // Add pseudo symbols for jump or call target addresses.
         if (instruction.info.raw.imm[0].is_relative)
         {
-            Address64T absolute_address;
-            ZydisCalcAbsoluteAddress(&instruction.info, instruction.operands, instruction_address, &absolute_address);
-
-            if (absolute_address >= m_beginAddress && absolute_address < m_endAddress)
+            ZyanU64 addr;
+            if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(&instruction.info, instruction.operands, instruction_address, &addr))
+                && addr >= m_beginAddress && addr < m_endAddress)
             {
-                const std::string_view prefix = is_call(&instruction.info) ? s_prefix_sub : s_prefix_loc;
-
-                add_pseudo_symbol(absolute_address, prefix);
+                if (is_call(&instruction.info))
+                {
+                    add_pseudo_symbol(addr, s_prefix_sub);
+                }
+                else
+                {
+                    add_pseudo_symbol(addr, s_prefix_loc);
+                    add_jump_destination(addr, instruction_address);
+                }
             }
         }
     }
@@ -826,34 +831,16 @@ void Function::disassemble(const FunctionSetup &setup)
         {
             asm_instruction.text = instruction_buffer;
 
-            const JumpType jump_type = get_jump_type(&instruction.info, &instruction.operands[0]);
-
-            if (jump_type == JumpType::ImmShort)
+            if (!is_call(&instruction.info) && instruction.info.raw.imm[0].is_relative)
             {
-                const int64_t offset = instruction.operands[0].imm.value.s;
-                assert(std::abs(offset) < (1 << (sizeof(AsmInstruction::jumpLen) * 8)) / 2);
-                asm_instruction.isJump = true;
-                asm_instruction.jumpLen = offset;
-            }
-            else if (jump_type == JumpType::ImmLong)
-            {
-                // Is only stable when jumping within a single function.
-                ZyanU64 jump_address;
-                if (ZYAN_SUCCESS(ZydisCalcAbsoluteAddress(
-                        &instruction.info,
-                        &instruction.operands[0],
-                        instruction_address,
-                        &jump_address)))
+                ZyanU64 addr;
+                if (ZYAN_SUCCESS(
+                        ZydisCalcAbsoluteAddress(&instruction.info, instruction.operands, instruction_address, &addr))
+                    && addr >= m_beginAddress && addr < m_endAddress)
                 {
-                    if (jump_address >= get_begin_address() && jump_address < get_end_address())
-                    {
-                        const int64_t offset = int64_t(jump_address) - int64_t(instruction_address);
-#if 0 // Cannot assert this when disassembling a range beyond a single function.
-                        assert(std::abs(offset) < (1 << (sizeof(AsmInstruction::jumpLen) * 8)) / 2);
-#endif
-                        asm_instruction.isJump = true;
-                        asm_instruction.jumpLen = offset;
-                    }
+                    const int64_t offset = int64_t(addr) - int64_t(instruction_address);
+                    asm_instruction.isJump = true;
+                    asm_instruction.jumpLen = down_cast<int32_t>(offset);
                 }
             }
         }
@@ -866,6 +853,34 @@ void Function::disassemble(const FunctionSetup &setup)
     m_setup = nullptr;
 }
 
+void Function::add_jump_destination(Address64T jumpDestination, Address64T jumpOrigin)
+{
+    Address64ToIndexMap::iterator it = m_jumpDestinationAddressToIndexMap.find(jumpDestination);
+    if (it == m_jumpDestinationAddressToIndexMap.end())
+    {
+        const IndexT index = m_jumpDestinationInfos.size();
+        m_jumpDestinationInfos.emplace_back();
+        it = m_jumpDestinationAddressToIndexMap.emplace_hint(it, jumpDestination, index);
+    }
+
+    assert(it != m_jumpDestinationAddressToIndexMap.end());
+
+    AsmJumpDestinationInfo &info = m_jumpDestinationInfos[it->second];
+    info.jumpDestination = jumpDestination;
+    info.jumpOrigins.push_back(jumpOrigin);
+}
+
+const AsmJumpDestinationInfo *Function::get_jump_destination_info(Address64T address) const
+{
+    Address64ToIndexMap::const_iterator it = m_jumpDestinationAddressToIndexMap.find(address);
+
+    if (it != m_jumpDestinationAddressToIndexMap.end())
+    {
+        return &m_jumpDestinationInfos[it->second];
+    }
+    return nullptr;
+}
+
 bool Function::add_pseudo_symbol(Address64T address, std::string_view prefix)
 {
     {
@@ -876,12 +891,9 @@ bool Function::add_pseudo_symbol(Address64T address, std::string_view prefix)
         }
     }
 
-    auto &pseudoSymbolVec = m_pseudoSymbols;
-    auto &pseudoSymbolMap = m_pseudoSymbolAddressToIndexMap;
+    Address64ToIndexMap::iterator it = m_pseudoSymbolAddressToIndexMap.find(address);
 
-    Address64ToIndexMap::iterator it = pseudoSymbolMap.find(address);
-
-    if (it != pseudoSymbolMap.end())
+    if (it != m_pseudoSymbolAddressToIndexMap.end())
     {
         return false;
     }
@@ -891,9 +903,9 @@ bool Function::add_pseudo_symbol(Address64T address, std::string_view prefix)
     symbol.address = address;
     symbol.size = 0;
 
-    const IndexT index = static_cast<IndexT>(pseudoSymbolVec.size());
-    pseudoSymbolVec.emplace_back(std::move(symbol));
-    [[maybe_unused]] auto [_, added] = pseudoSymbolMap.try_emplace(address, index);
+    const IndexT index = static_cast<IndexT>(m_pseudoSymbols.size());
+    m_pseudoSymbols.emplace_back(std::move(symbol));
+    [[maybe_unused]] auto [_, added] = m_pseudoSymbolAddressToIndexMap.try_emplace(address, index);
     assert(added);
 
     return true;
@@ -901,14 +913,11 @@ bool Function::add_pseudo_symbol(Address64T address, std::string_view prefix)
 
 const ExeSymbol *Function::get_pseudo_symbol(Address64T address) const
 {
-    const auto &pseudoSymbolVec = m_pseudoSymbols;
-    const auto &pseudoSymbolMap = m_pseudoSymbolAddressToIndexMap;
+    Address64ToIndexMap::const_iterator it = m_pseudoSymbolAddressToIndexMap.find(address);
 
-    Address64ToIndexMap::const_iterator it = pseudoSymbolMap.find(address);
-
-    if (it != pseudoSymbolMap.end())
+    if (it != m_pseudoSymbolAddressToIndexMap.end())
     {
-        return &pseudoSymbolVec[it->second];
+        return &m_pseudoSymbols[it->second];
     }
     return nullptr;
 }

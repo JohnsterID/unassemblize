@@ -12,6 +12,7 @@
  */
 #pragma once
 
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include "util/nocopy.h"
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -63,6 +64,9 @@ constexpr ImU32 CreateColor(ImU32 color, uint8_t alpha)
 }
 
 void DrawInTextCircle(ImU32 color);
+void DrawInTextTriangle(ImU32 color, ImGuiDir dir);
+
+void DrawTriangle(ImDrawList *draw_list, ImVec2 center, float r, ImU32 color, ImGuiDir dir);
 
 void DrawTextBackgroundColor(std::string_view view, ImU32 color, const ImVec2 &pos);
 

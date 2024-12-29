@@ -50,6 +50,23 @@ void AsmInstruction::set_bytes(const uint8_t *p, size_t size)
     bytes.set_size(static_cast<uint8_t>(max_bytes));
 }
 
+std::optional<ptrdiff_t> get_instruction_distance(
+    const AsmInstructions &instructions,
+    Address64T address1,
+    Address64T address2)
+{
+    AsmInstructions::const_iterator it1 = std::lower_bound(instructions.begin(), instructions.end(), address1);
+    if (it1 != instructions.end() && it1->address == address1)
+    {
+        AsmInstructions::const_iterator it2 = std::lower_bound(instructions.begin(), instructions.end(), address2);
+        if (it2 != instructions.end() && it2->address == address2)
+        {
+            return std::distance(it1, it2);
+        }
+    }
+    return std::nullopt;
+}
+
 InstructionTextArray split_instruction_text(std::string_view text)
 {
     InstructionTextArray arr;

@@ -21,6 +21,8 @@
 
 #include "runnerasync.h"
 
+#include <unordered_set>
+
 struct CommandLineOptions;
 
 namespace unassemblize::gui
@@ -88,16 +90,30 @@ class ImGuiApp
         SourceCode,
         Bytes,
         Address,
+        Jumps,
         Assembler,
     };
 
     // Class to help draw the assembler table columns. The default column order is different on left and right panes.
     class AssemblerTableColumnsDrawer
     {
+        using InstructionSource = std::variant<const AsmInstructions *, const AsmComparisonRecords *>;
+        using AddressSet = std::unordered_set<Address64T>;
+
     public:
-        explicit AssemblerTableColumnsDrawer(const TextFileContent *fileContent);
+        explicit AssemblerTableColumnsDrawer(
+            const NamedFunction &namedFunction,
+            const TextFileContent *fileContent,
+            const AsmInstructions *instructions);
+
+        explicit AssemblerTableColumnsDrawer(
+            const NamedFunction &namedFunction,
+            const TextFileContent *fileContent,
+            const AsmComparisonRecords *records,
+            Side side);
 
         static void SetupColumns(const std::vector<AssemblerTableColumn> &columns);
+
         void PrintAsmInstructionColumns(
             const std::vector<AssemblerTableColumn> &columns,
             const AsmInstruction &instruction,
@@ -105,13 +121,27 @@ class ImGuiApp
 
     private:
         static void SetupColumn(AssemblerTableColumn column);
+
         void PrintAsmInstructionColumn(
             AssemblerTableColumn column,
             const AsmInstruction &instruction,
             const AsmMismatchInfo &mismatchInfo);
 
+        void PrintAsmJumpLines(const AsmInstruction &instruction);
+
+        std::optional<ptrdiff_t> GetDistance(Address64T address1, Address64T address2);
+
+        void AddAsmJumpLine(ImVec2 screenPos, ptrdiff_t distance, bool cursorPosIsOrigin);
+
     private:
-        const TextFileContent *m_fileContent;
+        const NamedFunction &m_namedFunction;
+        const TextFileContent *m_fileContent; // Can be null.
+        const InstructionSource m_instructionSource;
+        const Side m_side = LeftSide;
+
+        // Addresses that have their jumps currently drawn.
+        // Since lists use the ImGui clipper, not all jumps are drawn at the same time.
+        std::unordered_set<Address64T> m_drawnJumpOrigins;
     };
 
 public:
