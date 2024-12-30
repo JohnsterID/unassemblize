@@ -1931,8 +1931,14 @@ void ImGuiApp::FileManagerInfoExeSections(const ProgramFileRevisionDescriptor &d
     ImGui::Text("Count: %zu", sections.size());
 
     const float defaultHeight = GetDefaultTableHeight(sections.size(), 10);
-    ImScoped::Child child("exe_sections_container", ImVec2(0.0f, defaultHeight), ImGuiChildFlags_ResizeY);
-    if (child.IsContentVisible)
+
+    ImScoped::Child resizeChild(
+        "exe_sections_container",
+        ImVec2(0.0f, defaultHeight),
+        ImGuiChildFlags_ResizeY,
+        ImGuiWindowFlags_NoSavedSettings);
+
+    if (resizeChild.IsContentVisible)
     {
         if (ImGui::BeginTable("exe_sections", 3, FileManagerInfoTableFlags))
         {
@@ -1978,8 +1984,14 @@ void ImGuiApp::FileManagerInfoExeSymbols(
     }
 
     const float defaultHeight = GetDefaultTableHeight(filtered.size(), 10);
-    ImScoped::Child child("exe_symbols_container", ImVec2(0.0f, defaultHeight), ImGuiChildFlags_ResizeY);
-    if (child.IsContentVisible)
+
+    ImScoped::Child resizeChild(
+        "exe_symbols_container",
+        ImVec2(0.0f, defaultHeight),
+        ImGuiChildFlags_ResizeY,
+        ImGuiWindowFlags_NoSavedSettings);
+
+    if (resizeChild.IsContentVisible)
     {
         if (ImGui::BeginTable("exe_symbols", 3, FileManagerInfoTableFlags))
         {
@@ -2025,8 +2037,14 @@ void ImGuiApp::FileManagerInfoPdbCompilands(const ProgramFileRevisionDescriptor 
     ImGui::Text("Count: %zu", compilands.size());
 
     const float defaultHeight = GetDefaultTableHeight(compilands.size(), 10);
-    ImScoped::Child child("pdb_compilands_container", ImVec2(0.0f, defaultHeight), ImGuiChildFlags_ResizeY);
-    if (child.IsContentVisible)
+
+    ImScoped::Child resizeChild(
+        "pdb_compilands_container",
+        ImVec2(0.0f, defaultHeight),
+        ImGuiChildFlags_ResizeY,
+        ImGuiWindowFlags_NoSavedSettings);
+
+    if (resizeChild.IsContentVisible)
     {
         if (ImGui::BeginTable("pdb_compilands", 1, FileManagerInfoTableFlags))
         {
@@ -2064,8 +2082,14 @@ void ImGuiApp::FileManagerInfoPdbSourceFiles(const ProgramFileRevisionDescriptor
     ImGui::Text("Count: %zu", source_files.size());
 
     const float defaultHeight = GetDefaultTableHeight(source_files.size(), 10);
-    ImScoped::Child child("pdb_source_files_container", ImVec2(0.0f, defaultHeight), ImGuiChildFlags_ResizeY);
-    if (child.IsContentVisible)
+
+    ImScoped::Child resizeChild(
+        "pdb_source_files_container",
+        ImVec2(0.0f, defaultHeight),
+        ImGuiChildFlags_ResizeY,
+        ImGuiWindowFlags_NoSavedSettings);
+
+    if (resizeChild.IsContentVisible)
     {
         if (ImGui::BeginTable("pdb_source_files", 3, FileManagerInfoTableFlags))
         {
@@ -2149,8 +2173,14 @@ void ImGuiApp::FileManagerInfoPdbSymbols(
         sections = &revisionDescriptor.m_executable->get_sections();
 
     const float defaultHeight = GetDefaultTableHeight(filtered.size(), 10);
-    ImScoped::Child child("pdb_symbols_container", ImVec2(0.0f, defaultHeight), ImGuiChildFlags_ResizeY);
-    if (child.IsContentVisible)
+
+    ImScoped::Child resizeChild(
+        "pdb_symbols_container",
+        ImVec2(0.0f, defaultHeight),
+        ImGuiChildFlags_ResizeY,
+        ImGuiWindowFlags_NoSavedSettings);
+
+    if (resizeChild.IsContentVisible)
     {
         if (ImGui::BeginTable("pdb_symbols", 6, FileManagerInfoTableFlags))
         {
@@ -2226,8 +2256,14 @@ void ImGuiApp::FileManagerInfoPdbFunctions(
     }
 
     const float defaultHeight = GetDefaultTableHeight(filtered.size(), 10);
-    ImScoped::Child child("pdb_functions_container", ImVec2(0.0f, defaultHeight), ImGuiChildFlags_ResizeY);
-    if (child.IsContentVisible)
+
+    ImScoped::Child resizeChild(
+        "pdb_functions_container",
+        ImVec2(0.0f, defaultHeight),
+        ImGuiChildFlags_ResizeY,
+        ImGuiWindowFlags_NoSavedSettings);
+
+    if (resizeChild.IsContentVisible)
     {
         if (ImGui::BeginTable("pdb_functions", 5, FileManagerInfoTableFlags))
         {
@@ -2855,7 +2891,6 @@ void ImGuiApp::ComparisonManagerMatchedFunctions(
             ComparisonManagerItemListStyleColor(styleColor, *uiInfo, treeOffsetX);
         }
 
-        // #TODO: Check if node can be excluded from imgui ini save because it makes it big and slow.
         ImScoped::TreeNodeEx tree(
             uiInfo->m_label.c_str(),
             ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth);
@@ -2886,7 +2921,7 @@ void ImGuiApp::ComparisonManagerMatchedFunction(
         "##matched_function_resize",
         ImVec2(0.0f, defaultHeight),
         ImGuiChildFlags_ResizeY,
-        ImGuiWindowFlags_AlwaysVerticalScrollbar);
+        ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_NoSavedSettings);
 
     if (resizeChild.IsContentVisible)
     {
@@ -3019,7 +3054,6 @@ void ImGuiApp::ComparisonManagerNamedFunctions(
 
         const File::NamedFunctionUiInfo &uiInfo0 = file.m_namedFunctionUiInfos[namedFunctionIndex];
 
-        // #TODO: Check if node can be excluded from ImGui INI save because it makes it big and slow.
         ImScoped::TreeNodeEx tree(
             uiInfo0.m_label.c_str(),
             ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth);
@@ -3049,7 +3083,7 @@ void ImGuiApp::ComparisonManagerNamedFunction(
         "##matched_function_resize",
         ImVec2(0.0f, defaultHeight),
         ImGuiChildFlags_ResizeY,
-        ImGuiWindowFlags_NoScrollbar);
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings);
 
     if (resizeChild.IsContentVisible)
     {

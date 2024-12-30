@@ -40,6 +40,7 @@ class ImGuiApp
         ImGuiTableFlags_Resizable |
         ImGuiTableFlags_Reorderable |
         ImGuiTableFlags_Hideable |
+        ImGuiTableFlags_NoSavedSettings |
         ImGuiTableFlags_ContextMenuInBody |
         ImGuiTableFlags_RowBg |
         ImGuiTableFlags_BordersOuter |
@@ -57,6 +58,7 @@ class ImGuiApp
         ImGuiTableFlags_Resizable |
         ImGuiTableFlags_Reorderable |
         ImGuiTableFlags_Hideable |
+        ImGuiTableFlags_NoSavedSettings |
         ImGuiTableFlags_ContextMenuInBody |
         ImGuiTableFlags_RowBg |
         ImGuiTableFlags_BordersOuter |
