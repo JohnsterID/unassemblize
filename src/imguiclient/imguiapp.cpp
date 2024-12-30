@@ -2951,8 +2951,46 @@ void ImGuiApp::ComparisonManagerMatchedFunctions(
 
         if (tree.IsOpen)
         {
+            ComparisonManagerMatchedFunctionSummary(descriptor, matchedFunction);
             ComparisonManagerMatchedFunction(descriptor, matchedFunction);
         }
+    }
+}
+
+void ImGuiApp::ComparisonManagerMatchedFunctionSummary(
+    const ProgramComparisonDescriptor &descriptor,
+    const MatchedFunction &matchedFunction)
+{
+    assert(matchedFunction.is_compared());
+
+    const AsmComparisonResult &comparison = matchedFunction.comparison;
+
+    const uint32_t matchCount = comparison.get_match_count(descriptor.m_imguiStrictness);
+    const uint32_t maxMatchCount = comparison.get_max_match_count(descriptor.m_imguiStrictness);
+    const uint32_t mismatchCount = comparison.get_mismatch_count(descriptor.m_imguiStrictness);
+    const uint32_t maxMismatchCount = comparison.get_max_mismatch_count(descriptor.m_imguiStrictness);
+    const float similarity = comparison.get_similarity(descriptor.m_imguiStrictness);
+    const float maxSimilarity = comparison.get_max_similarity(descriptor.m_imguiStrictness);
+
+    ImGui::Text("Matches: %u", matchCount);
+    if (maxMatchCount != matchCount)
+    {
+        ImGui::SameLine();
+        ImGui::Text("or %u", maxMatchCount);
+    }
+    ImGui::SameLine();
+    ImGui::Text("- Mismatches: %u", mismatchCount);
+    if (maxMismatchCount != mismatchCount)
+    {
+        ImGui::SameLine();
+        ImGui::Text("or %u", maxMismatchCount);
+    }
+    ImGui::SameLine();
+    ImGui::Text("- Similarity: %.1f %%", similarity * 100.f);
+    if (maxSimilarity != similarity)
+    {
+        ImGui::SameLine();
+        ImGui::Text("or %.1f %%", maxSimilarity * 100.f);
     }
 }
 

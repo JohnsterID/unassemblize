@@ -321,6 +321,9 @@ private:
     static void ComparisonManagerMatchedFunctions(
         const ProgramComparisonDescriptor &descriptor,
         span<const IndexT> matchedFunctionIndices);
+    static void ComparisonManagerMatchedFunctionSummary(
+        const ProgramComparisonDescriptor &descriptor,
+        const MatchedFunction &matchedFunction);
     static void ComparisonManagerMatchedFunction(
         const ProgramComparisonDescriptor &descriptor,
         const MatchedFunction &matchedFunction);
