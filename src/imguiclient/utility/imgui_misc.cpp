@@ -137,7 +137,7 @@ void OverlayProgressBar(const ImRect &rect, float fraction, const char *overlay)
     constexpr ImGuiWindowFlags childFlags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse
         | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoBackground;
 
-    ImScoped::Child child("##progress_child", childSize, false, childFlags);
+    ImScoped::Child child("progress_child", childSize, false, childFlags);
 
     if (child.IsContentVisible)
     {

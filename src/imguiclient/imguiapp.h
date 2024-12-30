@@ -384,7 +384,7 @@ private:
     bool m_showFileManagerPdbFunctionInfo = true;
     bool m_showFileManagerPdbExeInfo = true;
 
-    bool m_showOutputManager = true;
+    bool m_showOutputManager = false;
 
     WorkQueue m_workQueue;
 

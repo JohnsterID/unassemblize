@@ -1503,7 +1503,7 @@ void ImGuiApp::FileManagerBody()
 
     if (show_files && m_showFileManagerWithTabs)
     {
-        show_files = ImGui::BeginTabBar("##file_tabs");
+        show_files = ImGui::BeginTabBar("file_tabs");
     }
 
     if (show_files)
@@ -1530,7 +1530,7 @@ void ImGuiApp::FileManagerBody()
             else
             {
                 const std::string title = descriptor.create_descriptor_name_with_file_info();
-                is_open = TreeNodeHeader("##file_tree", ImGuiTreeNodeFlags_DefaultOpen, title.c_str());
+                is_open = TreeNodeHeader("file_tree", ImGuiTreeNodeFlags_DefaultOpen, title.c_str());
             }
 
             if (is_open)
@@ -2368,7 +2368,7 @@ void ImGuiApp::ComparisonManagerBody(ProgramComparisonDescriptor &descriptor)
 
 void ImGuiApp::ComparisonManagerFilesHeaders()
 {
-    ImScoped::Table table("##files_header_table", 2, ComparisonSplitTableFlags);
+    ImScoped::Table table("files_header_table", 2, ComparisonSplitTableFlags);
     if (table.IsContentVisible)
     {
         ImGui::TableNextRow();
@@ -2384,10 +2384,10 @@ void ImGuiApp::ComparisonManagerFilesHeaders()
 void ImGuiApp::ComparisonManagerFilesLists(ProgramComparisonDescriptor &descriptor)
 {
     const ImVec2 outer_size(0, ImGui::GetTextLineHeightWithSpacing() * 9);
-    ImScoped::Child resizeChild("##files_list_resize", outer_size, ImGuiChildFlags_ResizeY);
+    ImScoped::Child resizeChild("files_list_resize", outer_size, ImGuiChildFlags_ResizeY);
     if (resizeChild.IsContentVisible)
     {
-        ImScoped::Table table("##files_list_table", 2, ComparisonSplitTableFlags);
+        ImScoped::Table table("files_list_table", 2, ComparisonSplitTableFlags);
         if (table.IsContentVisible)
         {
             ImGui::TableNextRow();
@@ -2408,7 +2408,7 @@ void ImGuiApp::ComparisonManagerFilesLists(ProgramComparisonDescriptor &descript
 void ImGuiApp::ComparisonManagerFilesList(ProgramComparisonDescriptor::File &file)
 {
     ImScoped::Child styleChild(
-        "##files_list_style",
+        "files_list_style",
         ImVec2(0, 0),
         ImGuiChildFlags_FrameStyle,
         ImGuiWindowFlags_HorizontalScrollbar);
@@ -2503,7 +2503,7 @@ void ImGuiApp::ComparisonManagerFilesProgressOverlay(const ProgramComparisonDesc
 
 void ImGuiApp::ComparisonManagerFilesStatus(const ProgramComparisonDescriptor &descriptor)
 {
-    ImScoped::Table table("##status_table", 2, ComparisonSplitTableFlags);
+    ImScoped::Table table("status_table", 2, ComparisonSplitTableFlags);
     if (table.IsContentVisible)
     {
         ImGui::TableNextRow();
@@ -2525,7 +2525,7 @@ void ImGuiApp::ComparisonManagerFilesStatus(const ProgramComparisonDescriptor &d
 
 void ImGuiApp::ComparisonManagerBundlesSettings(ProgramComparisonDescriptor &descriptor)
 {
-    ImScoped::Table table("##bundles_filter_table", 2, ComparisonSplitTableFlags);
+    ImScoped::Table table("bundles_filter_table", 2, ComparisonSplitTableFlags);
     if (table.IsContentVisible)
     {
         ImGui::TableNextRow();
@@ -2599,10 +2599,10 @@ void ImGuiApp::ComparisonManagerBundlesFilter(ProgramComparisonDescriptor::File 
 void ImGuiApp::ComparisonManagerBundlesLists(ProgramComparisonDescriptor &descriptor)
 {
     const ImVec2 defaultSize(0, ImGui::GetTextLineHeightWithSpacing() * 9);
-    ImScoped::Child resizeChild("##bundles_list_resize", defaultSize, ImGuiChildFlags_ResizeY);
+    ImScoped::Child resizeChild("bundles_list_resize", defaultSize, ImGuiChildFlags_ResizeY);
     if (resizeChild.IsContentVisible)
     {
-        ImScoped::Table table("##bundles_list_table", 2, ComparisonSplitTableFlags);
+        ImScoped::Table table("bundles_list_table", 2, ComparisonSplitTableFlags);
         if (table.IsContentVisible)
         {
             ImGui::TableNextRow();
@@ -2627,7 +2627,7 @@ void ImGuiApp::ComparisonManagerBundlesList(ProgramComparisonDescriptor::File &f
     // Using AlwaysHorizontalScrollbar instead of HorizontalScrollbar because the list is glitching a bit
     // when the clipper makes it alternate between scroll bar on and off every frame in some situations.
     ImScoped::Child styleChild(
-        "##bundles_list_style",
+        "bundles_list_style",
         ImVec2(0, 0),
         ImGuiChildFlags_FrameStyle,
         ImGuiWindowFlags_AlwaysHorizontalScrollbar);
@@ -2684,7 +2684,7 @@ void ImGuiApp::ComparisonManagerBundlesList(ProgramComparisonDescriptor::File &f
 
 void ImGuiApp::ComparisonManagerFunctionsSettings(ProgramComparisonDescriptor &descriptor)
 {
-    ImScoped::Table table("##functions_filter_table", 2, ComparisonSplitTableFlags);
+    ImScoped::Table table("functions_filter_table", 2, ComparisonSplitTableFlags);
     if (table.IsContentVisible)
     {
         ImGui::TableNextRow();
@@ -2739,10 +2739,10 @@ void ImGuiApp::ComparisonManagerFunctionsFilter(
 void ImGuiApp::ComparisonManagerFunctionsLists(ProgramComparisonDescriptor &descriptor)
 {
     const ImVec2 defaultSize(0, ImGui::GetTextLineHeightWithSpacing() * 9);
-    ImScoped::Child resizeChild("##functions_list_resize", defaultSize, ImGuiChildFlags_ResizeY);
+    ImScoped::Child resizeChild("functions_list_resize", defaultSize, ImGuiChildFlags_ResizeY);
     if (resizeChild.IsContentVisible)
     {
-        ImScoped::Table table("##functions_list_table", 2, ComparisonSplitTableFlags);
+        ImScoped::Table table("functions_list_table", 2, ComparisonSplitTableFlags);
         if (table.IsContentVisible)
         {
             ImGui::TableNextRow();
@@ -2769,7 +2769,7 @@ void ImGuiApp::ComparisonManagerFunctionsList(
     // Using AlwaysHorizontalScrollbar instead of HorizontalScrollbar because the list is glitching a bit
     // when the clipper makes it alternate between scroll bar on and off every frame in some situations.
     ImScoped::Child styleChild(
-        "##functions_list_style",
+        "functions_list_style",
         ImVec2(0, 0),
         ImGuiChildFlags_FrameStyle,
         ImGuiWindowFlags_AlwaysHorizontalScrollbar);
@@ -2829,7 +2829,7 @@ void ImGuiApp::ComparisonManagerFunctionEntries(ProgramComparisonDescriptor &des
 {
     ComparisonManagerFunctionEntriesControls(descriptor);
 
-    ImScoped::Child child("##function_entries");
+    ImScoped::Child child("function_entries");
     if (child.IsContentVisible)
     {
         const ProgramComparisonDescriptor::FunctionsPageData pageData = descriptor.get_selected_functions_page_data();
@@ -2918,7 +2918,7 @@ void ImGuiApp::ComparisonManagerMatchedFunction(
     const float defaultHeight = GetDefaultTableHeight(records.size(), 10) + 4.0f;
     ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(FLT_MAX, maxHeight));
     ImScoped::Child resizeChild(
-        "##matched_function_resize",
+        "matched_function_resize",
         ImVec2(0.0f, defaultHeight),
         ImGuiChildFlags_ResizeY,
         ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_NoSavedSettings);
@@ -2927,16 +2927,16 @@ void ImGuiApp::ComparisonManagerMatchedFunction(
     {
         constexpr ImGuiTableFlags comparisonTableFlags = ComparisonSplitTableFlags | ImGuiTableFlags_NoPadInnerX;
 
-        ImScoped::Table table("##matched_function_table", 3, comparisonTableFlags);
+        ImScoped::Table table("matched_function_table", 3, comparisonTableFlags);
         if (table.IsContentVisible)
         {
             // * 4 because column text is intended to be 4 characters wide.
             const float cellPadding = ImGui::GetStyle().CellPadding.x;
             const float column1Width = ImGui::GetFont()->GetCharAdvance(' ') * 4 + cellPadding * 2;
 
-            ImGui::TableSetupColumn("##column0", ImGuiTableColumnFlags_WidthStretch, 50.0f);
-            ImGui::TableSetupColumn("##column1", ImGuiTableColumnFlags_WidthFixed, column1Width);
-            ImGui::TableSetupColumn("##column2", ImGuiTableColumnFlags_WidthStretch, 50.0f);
+            ImGui::TableSetupColumn("column0", ImGuiTableColumnFlags_WidthStretch, 50.0f);
+            ImGui::TableSetupColumn("column1", ImGuiTableColumnFlags_WidthFixed, column1Width);
+            ImGui::TableSetupColumn("column2", ImGuiTableColumnFlags_WidthStretch, 50.0f);
             ImGui::TableNextRow();
 
             {
@@ -2985,10 +2985,9 @@ void ImGuiApp::ComparisonManagerMatchedFunctionContentTable(
     AssemblerTableColumnsDrawer columnsDrawer(namedFunction, fileContent, &records, side);
 
     const ImVec2 tableSize(0.0f, GetMaxTableHeight(records.size()));
-    ImScoped::Table table("##function_assembler_table", assemblerTableColumns.size(), AssemblerTableFlags, tableSize);
+    ImScoped::Table table("function_assembler_table", assemblerTableColumns.size(), AssemblerTableFlags, tableSize);
     if (table.IsContentVisible)
     {
-        // #TODO: Implement coloring for matches and mismatches.
         // #TODO: Add feature to auto hide columns by default.
         // #TODO: Add feature to change default or current width of columns.
 
@@ -3019,8 +3018,6 @@ void ImGuiApp::ComparisonManagerMatchedFunctionContentTable(
 
                 if (const AsmInstruction *instruction = record.pair[side])
                 {
-                    // #TODO: Set special background color to Address when AsmInstruction::isSymbol is true
-
                     columnsDrawer.PrintAsmInstructionColumns(assemblerTableColumns, *instruction, mismatchInfo);
                 }
                 else
@@ -3080,7 +3077,7 @@ void ImGuiApp::ComparisonManagerNamedFunction(
     const float defaultHeight = GetDefaultTableHeight(records.size(), 10) + 4.0f;
     ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f), ImVec2(FLT_MAX, maxHeight));
     ImScoped::Child resizeChild(
-        "##matched_function_resize",
+        "matched_function_resize",
         ImVec2(0.0f, defaultHeight),
         ImGuiChildFlags_ResizeY,
         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings);
@@ -3092,7 +3089,7 @@ void ImGuiApp::ComparisonManagerNamedFunction(
         const float availableWidth = ImGui::GetContentRegionAvail().x;
         const float scrollbarWidth = ImGui::GetStyle().ScrollbarSize;
         ImVec2 tableSize(availableWidth - scrollbarWidth, 0.0f);
-        ImScoped::Table table("##matched_function_table", 3, comparisonTableFlags, tableSize);
+        ImScoped::Table table("matched_function_table", 3, comparisonTableFlags, tableSize);
         if (table.IsContentVisible)
         {
             // * 4 because column text is intended to be 4 characters wide.
@@ -3100,9 +3097,9 @@ void ImGuiApp::ComparisonManagerNamedFunction(
             const float column1Width = ImGui::GetFont()->GetCharAdvance(' ') * 4 + cellPadding * 2;
 
             // Creates 3 (invisible) columns to look consistent with the table of the matched function.
-            ImGui::TableSetupColumn("##column0", ImGuiTableColumnFlags_WidthStretch, 50.0f);
-            ImGui::TableSetupColumn("##column1", ImGuiTableColumnFlags_WidthFixed, column1Width);
-            ImGui::TableSetupColumn("##column2", ImGuiTableColumnFlags_WidthStretch, 50.0f);
+            ImGui::TableSetupColumn("column0", ImGuiTableColumnFlags_WidthStretch, 50.0f);
+            ImGui::TableSetupColumn("column1", ImGuiTableColumnFlags_WidthFixed, column1Width);
+            ImGui::TableSetupColumn("column2", ImGuiTableColumnFlags_WidthStretch, 50.0f);
             ImGui::TableNextRow();
 
             ImGui::TableSetColumnIndex(side == Side::LeftSide ? 0 : 2);
@@ -3124,7 +3121,7 @@ void ImGuiApp::ComparisonManagerNamedFunctionContentTable(
     AssemblerTableColumnsDrawer columnsDrawer(namedFunction, fileContent, &instructions);
 
     ImScoped::Table table(
-        "##function_assembler_table",
+        "function_assembler_table",
         assemblerTableColumns.size(),
         AssemblerTableFlags | ImGuiTableFlags_ScrollY);
 
@@ -3273,7 +3270,7 @@ void ImGuiApp::ComparisonManagerMatchedFunctionDiffSymbolTable(const AsmComparis
         ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_SizingFixedFit;
 
     const ImVec2 tableSize(0.0f, GetMaxTableHeight(records.size()));
-    ImScoped::Table table("##function_match_table", 1, tableFlags, tableSize);
+    ImScoped::Table table("function_match_table", 1, tableFlags, tableSize);
     if (table.IsContentVisible)
     {
         ImGui::TableSetupColumn("    ");
