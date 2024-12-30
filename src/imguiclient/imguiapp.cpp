@@ -1416,6 +1416,8 @@ void ImGuiApp::BackgroundWindow()
 
 void ImGuiApp::FileManagerWindow(bool *p_open)
 {
+    ImGui::SetNextWindowSizeConstraints(ImVec2(400, 300), ImVec2(FLT_MAX, FLT_MAX));
+
     ImScoped::Window window("File Manager", p_open, ImGuiWindowFlags_MenuBar);
     if (window.IsContentVisible)
     {
@@ -1469,6 +1471,8 @@ void ImGuiApp::ComparisonManagerWindows()
         ProgramComparisonDescriptor &descriptor = *m_programComparisons[i];
 
         const std::string title = fmt::format("Assembler Comparison {:d}", descriptor.m_id);
+
+        ImGui::SetNextWindowSizeConstraints(ImVec2(400, 300), ImVec2(FLT_MAX, FLT_MAX));
 
         ImScoped::Window window(title.c_str(), &descriptor.m_imguiHasOpenWindow);
         ImScoped::ID id(i);
@@ -1962,7 +1966,7 @@ void ImGuiApp::FileManagerInfoExeSymbols(
 {
     ImGui::SeparatorText("Exe Symbols");
 
-    const auto filtered = fileDescriptor.m_exeSymbolsFilter.Filtered();
+    const auto &filtered = fileDescriptor.m_exeSymbolsFilter.Filtered();
     {
         const ExeSymbols &symbols = revisionDescriptor.m_executable->get_symbols();
 
@@ -2121,7 +2125,7 @@ void ImGuiApp::FileManagerInfoPdbSymbols(
 {
     ImGui::SeparatorText("Pdb Symbols");
 
-    const auto filtered = fileDescriptor.m_pdbSymbolsFilter.Filtered();
+    const auto &filtered = fileDescriptor.m_pdbSymbolsFilter.Filtered();
     {
         const PdbSymbolInfoVector &symbols = revisionDescriptor.m_pdbReader->get_symbols();
 
@@ -2202,7 +2206,7 @@ void ImGuiApp::FileManagerInfoPdbFunctions(
 {
     ImGui::SeparatorText("Pdb Functions");
 
-    const auto filtered = fileDescriptor.m_pdbFunctionsFilter.Filtered();
+    const auto &filtered = fileDescriptor.m_pdbFunctionsFilter.Filtered();
     {
         const PdbFunctionInfoVector &functions = revisionDescriptor.m_pdbReader->get_functions();
 

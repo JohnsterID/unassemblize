@@ -44,7 +44,7 @@ struct TextFilterDescriptor
     template<typename Container>
     bool DrawAndUpdateFilter(const Container &source, FilterCallback<typename Container::value_type> &&filterCallback);
 
-    span<const FilterType> Filtered() const;
+    const ImVector<FilterType> &Filtered() const;
 
     // Clears the filtered state but does not reset the user specified filter words.
     void Reset();
@@ -100,9 +100,9 @@ bool TextFilterDescriptor<Type>::DrawAndUpdateFilter(
 }
 
 template<typename Type>
-span<const Type> TextFilterDescriptor<Type>::Filtered() const
+const ImVector<Type> &TextFilterDescriptor<Type>::Filtered() const
 {
-    return {m_filtered.begin(), m_filtered.end()};
+    return m_filtered;
 }
 
 template<typename Type>
