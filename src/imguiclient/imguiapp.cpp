@@ -2294,6 +2294,7 @@ void ImGuiApp::ComparisonManagerBody(ProgramComparisonDescriptor &descriptor)
     {
         {
             ComparisonManagerFilesHeaders();
+            MoveCursorScreenPos(0.0f, -5.0f); // Hack, removes gap.
 
             ImScoped::Group group;
             ImScoped::Disabled disabled(descriptor.has_async_work());
@@ -2311,12 +2312,14 @@ void ImGuiApp::ComparisonManagerBody(ProgramComparisonDescriptor &descriptor)
         if (TreeNodeHeader("Bundles", ImGuiTreeNodeFlags_DefaultOpen))
         {
             ComparisonManagerBundlesSettings(descriptor);
+            MoveCursorScreenPos(0.0f, -5.0f); // Hack, removes gap.
             ComparisonManagerBundlesLists(descriptor);
         }
 
         if (TreeNodeHeader("Functions", ImGuiTreeNodeFlags_DefaultOpen))
         {
             ComparisonManagerFunctionsSettings(descriptor);
+            MoveCursorScreenPos(0.0f, -5.0f); // Hack, removes gap.
             ComparisonManagerFunctionsLists(descriptor);
         }
 
@@ -2344,8 +2347,6 @@ void ImGuiApp::ComparisonManagerFilesHeaders()
 
 void ImGuiApp::ComparisonManagerFilesLists(ProgramComparisonDescriptor &descriptor)
 {
-    const ImVec2 cursorPos = ImGui::GetCursorScreenPos();
-    ImGui::SetCursorScreenPos(ImVec2(cursorPos.x, cursorPos.y - 5.0f)); // Hack, removes gap.
     const ImVec2 outer_size(0, ImGui::GetTextLineHeightWithSpacing() * 9);
     ImScoped::Child resizeChild("##files_list_resize", outer_size, ImGuiChildFlags_ResizeY);
     if (resizeChild.IsContentVisible)
@@ -2561,8 +2562,6 @@ void ImGuiApp::ComparisonManagerBundlesFilter(ProgramComparisonDescriptor::File 
 
 void ImGuiApp::ComparisonManagerBundlesLists(ProgramComparisonDescriptor &descriptor)
 {
-    const ImVec2 cursorPos = ImGui::GetCursorScreenPos();
-    ImGui::SetCursorScreenPos(ImVec2(cursorPos.x, cursorPos.y - 5.0f)); // Hack, removes gap.
     const ImVec2 defaultSize(0, ImGui::GetTextLineHeightWithSpacing() * 9);
     ImScoped::Child resizeChild("##bundles_list_resize", defaultSize, ImGuiChildFlags_ResizeY);
     if (resizeChild.IsContentVisible)
@@ -2703,8 +2702,6 @@ void ImGuiApp::ComparisonManagerFunctionsFilter(
 
 void ImGuiApp::ComparisonManagerFunctionsLists(ProgramComparisonDescriptor &descriptor)
 {
-    const ImVec2 cursorPos = ImGui::GetCursorScreenPos();
-    ImGui::SetCursorScreenPos(ImVec2(cursorPos.x, cursorPos.y - 5.0f)); // Hack, removes gap.
     const ImVec2 defaultSize(0, ImGui::GetTextLineHeightWithSpacing() * 9);
     ImScoped::Child resizeChild("##functions_list_resize", defaultSize, ImGuiChildFlags_ResizeY);
     if (resizeChild.IsContentVisible)

@@ -52,6 +52,8 @@ void TooltipTextUnformatted(std::string_view view);
 void TooltipTextMarker(const char *fmt, ...);
 void TooltipTextUnformattedMarker(const char *text, const char *text_end = nullptr);
 
+void MoveCursorScreenPos(float x, float y);
+
 void OverlayProgressBar(const ImRect &rect, float fraction, const char *overlay = nullptr);
 
 ImU32 ImAlphaBlendColors(ImU32 col_a, ImU32 col_b);

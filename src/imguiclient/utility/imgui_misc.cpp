@@ -121,6 +121,12 @@ void TooltipTextUnformattedMarker(const char *text, const char *text_end)
     TooltipTextUnformatted(text, text_end);
 }
 
+void MoveCursorScreenPos(float x, float y)
+{
+    const ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+    ImGui::SetCursorScreenPos(ImVec2(cursorPos.x + x, cursorPos.y + y));
+}
+
 void OverlayProgressBar(const ImRect &rect, float fraction, const char *overlay)
 {
     // Set position and size for the child window
