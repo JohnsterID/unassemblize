@@ -119,7 +119,8 @@ class ImGuiApp
         void PrintAsmInstructionColumns(
             const std::vector<AssemblerTableColumn> &columns,
             const AsmInstruction &instruction,
-            const AsmMismatchInfo &mismatchInfo = {});
+            const AsmMismatchInfo &mismatchInfo = {},
+            AsmMatchStrictness strictness = AsmMatchStrictness::Undecided);
 
     private:
         static void SetupColumn(AssemblerTableColumn column);
@@ -127,7 +128,8 @@ class ImGuiApp
         void PrintAsmInstructionColumn(
             AssemblerTableColumn column,
             const AsmInstruction &instruction,
-            const AsmMismatchInfo &mismatchInfo);
+            const AsmMismatchInfo &mismatchInfo,
+            AsmMatchStrictness strictness);
 
         void PrintAsmJumpLines(const AsmInstruction &instruction);
 
@@ -262,6 +264,7 @@ private:
     void OutputManagerWindow(bool *p_open);
     void ComparisonManagerWindows();
 
+    void FileManagerMenu();
     void FileManagerBody();
     void FileManagerDescriptor(ProgramFileDescriptor &descriptor, bool &erased);
     void FileManagerDescriptorExeFile(ProgramFileDescriptor &descriptor);
@@ -292,6 +295,7 @@ private:
 
     void OutputManagerBody();
 
+    void ComparisonManagerMenu(ProgramComparisonDescriptor &descriptor);
     void ComparisonManagerBody(ProgramComparisonDescriptor &descriptor);
     void ComparisonManagerFilesHeaders();
     void ComparisonManagerFilesLists(ProgramComparisonDescriptor &descriptor);
@@ -321,9 +325,9 @@ private:
         const ProgramComparisonDescriptor &descriptor,
         const MatchedFunction &matchedFunction);
     static void ComparisonManagerMatchedFunctionContentTable(
+        const ProgramComparisonDescriptor &descriptor,
         Side side,
         const AsmComparisonRecords &records,
-        const ProgramFileRevisionDescriptor &fileRevision,
         const NamedFunction &namedFunction);
 
     static void ComparisonManagerNamedFunctions(
@@ -343,9 +347,14 @@ private:
     static bool PrintAsmInstructionSourceCode(const AsmInstruction &instruction, const TextFileContent &fileContent);
     static void PrintAsmInstructionBytes(const AsmInstruction &instruction);
     static void PrintAsmInstructionAddress(const AsmInstruction &instruction);
-    static void PrintAsmInstructionAssembler(const AsmInstruction &instruction, const AsmMismatchInfo &mismatchInfo);
+    static void PrintAsmInstructionAssembler(
+        const AsmInstruction &instruction,
+        const AsmMismatchInfo &mismatchInfo,
+        AsmMatchStrictness strictness);
 
-    static void ComparisonManagerMatchedFunctionDiffSymbolTable(const AsmComparisonRecords &records);
+    static void ComparisonManagerMatchedFunctionDiffSymbolTable(
+        const AsmComparisonRecords &records,
+        AsmMatchStrictness strictness);
 
     static void ComparisonManagerItemListStyleColor(
         ScopedStyleColor &styleColor,
@@ -366,7 +375,7 @@ private:
     static const std::vector<AssemblerTableColumn> &GetAssemblerTableColumns(Side side, bool showSourceCodeColumns);
 
     static ImU32 GetAsmMatchValueColor(AsmMatchValueEx matchValue);
-    static ImU32 GetMismatchBitColor(const AsmMismatchInfo &mismatchInfo, int bit);
+    static ImU32 GetMismatchBitColor(const AsmMismatchInfo &mismatchInfo, AsmMatchStrictness strictness, int bit);
 
 private:
     ImVec2 m_windowPos = ImVec2(0, 0);

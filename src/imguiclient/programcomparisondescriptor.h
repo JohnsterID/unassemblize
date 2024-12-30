@@ -183,6 +183,8 @@ struct ProgramComparisonDescriptor
     bool matched_functions_built() const;
     bool bundles_ready() const;
 
+    const NamedFunction &get_named_function(Side side, IndexT index) const;
+
     span<const IndexT> get_matched_function_indices() const; // Links to MatchedFunctions.
 
     bool matched_functions_disassembled(span<const IndexT> matchedFunctionIndices) const;
@@ -211,6 +213,8 @@ struct ProgramComparisonDescriptor
 
     // UI OPTIONS. IS NOT RESET ON REBUILD.
 
+    AsmMatchStrictness m_imguiStrictness = AsmMatchStrictness::Undecided;
+
     // Selected functions in pages.
     int m_imguiPageSize = 25;
     int m_imguiSelectedPage = 1; // 1..n
@@ -238,6 +242,8 @@ private:
         const MatchedFunctions &matchedFunctions,
         span<const IndexT> matchedFunctionIndices,
         Side side);
+
+    AsmMatchStrictness m_strictnessUsedForUpdateBundleUiInfos = AsmMatchStrictness::Undecided;
 
     static ProgramComparisonId s_id;
 };

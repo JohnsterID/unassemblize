@@ -50,12 +50,13 @@ void ImGuiApp::AssemblerTableColumnsDrawer::SetupColumns(const std::vector<Assem
 void ImGuiApp::AssemblerTableColumnsDrawer::PrintAsmInstructionColumns(
     const std::vector<AssemblerTableColumn> &columns,
     const AsmInstruction &instruction,
-    const AsmMismatchInfo &mismatchInfo)
+    const AsmMismatchInfo &mismatchInfo,
+    AsmMatchStrictness strictness)
 {
     for (AssemblerTableColumn column : columns)
     {
         ImGui::TableNextColumn();
-        PrintAsmInstructionColumn(column, instruction, mismatchInfo);
+        PrintAsmInstructionColumn(column, instruction, mismatchInfo, strictness);
     }
 }
 
@@ -87,7 +88,8 @@ void ImGuiApp::AssemblerTableColumnsDrawer::SetupColumn(AssemblerTableColumn col
 void ImGuiApp::AssemblerTableColumnsDrawer::PrintAsmInstructionColumn(
     AssemblerTableColumn column,
     const AsmInstruction &instruction,
-    const AsmMismatchInfo &mismatchInfo)
+    const AsmMismatchInfo &mismatchInfo,
+    AsmMatchStrictness strictness)
 {
     // Note: Must always print a character in a row to satisfy the ImGui clipper.
 
@@ -113,7 +115,7 @@ void ImGuiApp::AssemblerTableColumnsDrawer::PrintAsmInstructionColumn(
             PrintAsmJumpLines(instruction);
             break;
         case AssemblerTableColumn::Assembler:
-            ImGuiApp::PrintAsmInstructionAssembler(instruction, mismatchInfo);
+            ImGuiApp::PrintAsmInstructionAssembler(instruction, mismatchInfo, strictness);
             break;
     }
 }
@@ -1421,35 +1423,7 @@ void ImGuiApp::FileManagerWindow(bool *p_open)
     ImScoped::Window window("File Manager", p_open, ImGuiWindowFlags_MenuBar);
     if (window.IsContentVisible)
     {
-        if (ImGui::BeginMenuBar())
-        {
-            if (ImGui::BeginMenu("File"))
-            {
-                if (ImGui::MenuItem("Add File"))
-                {
-                    add_file();
-                }
-                if (ImGui::MenuItem("Remove All Files"))
-                {
-                    remove_all_files();
-                }
-                ImGui::EndMenu();
-            }
-
-            if (ImGui::BeginMenu("View"))
-            {
-                ImGui::MenuItem("Show Tabs", nullptr, &m_showFileManagerWithTabs);
-                ImGui::MenuItem("Show Exe Section Info", nullptr, &m_showFileManagerExeSectionInfo);
-                ImGui::MenuItem("Show Exe Symbol Info", nullptr, &m_showFileManagerExeSymbolInfo);
-                ImGui::MenuItem("Show Pdb Compiland Info", nullptr, &m_showFileManagerPdbCompilandInfo);
-                ImGui::MenuItem("Show Pdb Source File Info", nullptr, &m_showFileManagerPdbSourceFileInfo);
-                ImGui::MenuItem("Show Pdb Symbol Info", nullptr, &m_showFileManagerPdbSymbolInfo);
-                ImGui::MenuItem("Show Pdb Function Info", nullptr, &m_showFileManagerPdbFunctionInfo);
-                ImGui::MenuItem("Show Pdb Exe Info", nullptr, &m_showFileManagerPdbExeInfo);
-                ImGui::EndMenu();
-            }
-            ImGui::EndMenuBar();
-        }
+        FileManagerMenu();
         FileManagerBody();
     }
 }
@@ -1474,10 +1448,11 @@ void ImGuiApp::ComparisonManagerWindows()
 
         ImGui::SetNextWindowSizeConstraints(ImVec2(400, 300), ImVec2(FLT_MAX, FLT_MAX));
 
-        ImScoped::Window window(title.c_str(), &descriptor.m_imguiHasOpenWindow);
+        ImScoped::Window window(title.c_str(), &descriptor.m_imguiHasOpenWindow, ImGuiWindowFlags_MenuBar);
         ImScoped::ID id(i);
-        if (window.IsContentVisible && descriptor.m_imguiHasOpenWindow)
+        if (window.IsContentVisible)
         {
+            ComparisonManagerMenu(descriptor);
             ComparisonManagerBody(descriptor);
         }
     }
@@ -1490,6 +1465,39 @@ namespace
 static const char *const g_browse_file_button_label = "Browse ..";
 static const std::string g_select_file_dialog_title = "Select File";
 } // namespace
+
+void ImGuiApp::FileManagerMenu()
+{
+    if (ImGui::BeginMenuBar())
+    {
+        if (ImGui::BeginMenu("File"))
+        {
+            if (ImGui::MenuItem("Add File"))
+            {
+                add_file();
+            }
+            if (ImGui::MenuItem("Remove All Files"))
+            {
+                remove_all_files();
+            }
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("View"))
+        {
+            ImGui::MenuItem("Show Tabs", nullptr, &m_showFileManagerWithTabs);
+            ImGui::MenuItem("Show Exe Section Info", nullptr, &m_showFileManagerExeSectionInfo);
+            ImGui::MenuItem("Show Exe Symbol Info", nullptr, &m_showFileManagerExeSymbolInfo);
+            ImGui::MenuItem("Show Pdb Compiland Info", nullptr, &m_showFileManagerPdbCompilandInfo);
+            ImGui::MenuItem("Show Pdb Source File Info", nullptr, &m_showFileManagerPdbSourceFileInfo);
+            ImGui::MenuItem("Show Pdb Symbol Info", nullptr, &m_showFileManagerPdbSymbolInfo);
+            ImGui::MenuItem("Show Pdb Function Info", nullptr, &m_showFileManagerPdbFunctionInfo);
+            ImGui::MenuItem("Show Pdb Exe Info", nullptr, &m_showFileManagerPdbExeInfo);
+            ImGui::EndMenu();
+        }
+        ImGui::EndMenuBar();
+    }
+}
 
 void ImGuiApp::FileManagerBody()
 {
@@ -2324,6 +2332,50 @@ void ImGuiApp::OutputManagerBody()
     ImGui::TextUnformatted("Not implemented");
 }
 
+void ImGuiApp::ComparisonManagerMenu(ProgramComparisonDescriptor &descriptor)
+{
+    if (ImGui::BeginMenuBar())
+    {
+        if (ImGui::BeginMenu("File"))
+        {
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("View"))
+        {
+            if (ImGui::BeginMenu("Strictness"))
+            {
+                const AsmMatchStrictness strictness = descriptor.m_imguiStrictness;
+                const bool isLenient = strictness == AsmMatchStrictness::Lenient;
+                const bool isUndecided = strictness == AsmMatchStrictness::Undecided;
+                const bool isStrict = strictness == AsmMatchStrictness::Strict;
+
+                if (ImGui::MenuItem("Lenient", nullptr, isLenient))
+                {
+                    descriptor.m_imguiStrictness = AsmMatchStrictness::Lenient;
+                }
+                if (ImGui::MenuItem("Undecided", nullptr, isUndecided))
+                {
+                    descriptor.m_imguiStrictness = AsmMatchStrictness::Undecided;
+                }
+                if (ImGui::MenuItem("Strict", nullptr, isStrict))
+                {
+                    descriptor.m_imguiStrictness = AsmMatchStrictness::Strict;
+                }
+                if (descriptor.m_imguiStrictness != strictness)
+                {
+                    descriptor.update_matched_named_function_ui_infos(descriptor.get_matched_function_indices());
+                    descriptor.update_all_bundle_ui_infos();
+                }
+                ImGui::EndMenu();
+            }
+
+            ImGui::EndMenu();
+        }
+        ImGui::EndMenuBar();
+    }
+}
+
 void ImGuiApp::ComparisonManagerBody(ProgramComparisonDescriptor &descriptor)
 {
     if (TreeNodeHeader("Files", ImGuiTreeNodeFlags_DefaultOpen))
@@ -2945,16 +2997,15 @@ void ImGuiApp::ComparisonManagerMatchedFunction(
                 const Side side = Side::LeftSide;
                 ImScoped::ID id(side);
 
-                const ProgramFileRevisionDescriptor &revision = *descriptor.m_files[side].m_revisionDescriptor;
                 const IndexT namedFunctionIndex = matchedFunction.named_idx_pair[side];
-                const NamedFunction &namedFunction = revision.m_namedFunctions[namedFunctionIndex];
-                ComparisonManagerMatchedFunctionContentTable(side, records, revision, namedFunction);
+                const NamedFunction &namedFunction = descriptor.get_named_function(side, namedFunctionIndex);
+                ComparisonManagerMatchedFunctionContentTable(descriptor, side, records, namedFunction);
             }
 
             {
                 ImGui::TableNextColumn();
 
-                ComparisonManagerMatchedFunctionDiffSymbolTable(records);
+                ComparisonManagerMatchedFunctionDiffSymbolTable(records, descriptor.m_imguiStrictness);
             }
 
             {
@@ -2963,23 +3014,23 @@ void ImGuiApp::ComparisonManagerMatchedFunction(
                 const Side side = Side::RightSide;
                 ImScoped::ID id(side);
 
-                const ProgramFileRevisionDescriptor &revision = *descriptor.m_files[side].m_revisionDescriptor;
                 const IndexT namedFunctionIndex = matchedFunction.named_idx_pair[side];
-                const NamedFunction &namedFunction = revision.m_namedFunctions[namedFunctionIndex];
-                ComparisonManagerMatchedFunctionContentTable(side, records, revision, namedFunction);
+                const NamedFunction &namedFunction = descriptor.get_named_function(side, namedFunctionIndex);
+                ComparisonManagerMatchedFunctionContentTable(descriptor, side, records, namedFunction);
             }
         }
     }
 }
 
 void ImGuiApp::ComparisonManagerMatchedFunctionContentTable(
+    const ProgramComparisonDescriptor &descriptor,
     Side side,
     const AsmComparisonRecords &records,
-    const ProgramFileRevisionDescriptor &fileRevision,
     const NamedFunction &namedFunction)
 {
+    const ProgramFileRevisionDescriptor &revision = *descriptor.m_files[side].m_revisionDescriptor;
     const std::string &sourceFile = namedFunction.function.get_source_file_name();
-    const TextFileContent *fileContent = fileRevision.m_fileContentStorage.find_content(sourceFile);
+    const TextFileContent *fileContent = revision.m_fileContentStorage.find_content(sourceFile);
     const bool showSourceCodeColumns = fileContent != nullptr;
     const std::vector<AssemblerTableColumn> &assemblerTableColumns = GetAssemblerTableColumns(side, showSourceCodeColumns);
     AssemblerTableColumnsDrawer columnsDrawer(namedFunction, fileContent, &records, side);
@@ -3005,9 +3056,8 @@ void ImGuiApp::ComparisonManagerMatchedFunctionContentTable(
                 ImGui::TableNextRow();
 
                 const AsmComparisonRecord &record = records[n];
-                // #TODO: Make strictness configurable.
                 const AsmMismatchInfo mismatchInfo = record.mismatch_info;
-                const AsmMatchValueEx matchValue = mismatchInfo.get_match_value_ex(AsmMatchStrictness::Undecided);
+                const AsmMatchValueEx matchValue = mismatchInfo.get_match_value_ex(descriptor.m_imguiStrictness);
 
                 if (matchValue != AsmMatchValueEx::IsMatch)
                 {
@@ -3018,7 +3068,11 @@ void ImGuiApp::ComparisonManagerMatchedFunctionContentTable(
 
                 if (const AsmInstruction *instruction = record.pair[side])
                 {
-                    columnsDrawer.PrintAsmInstructionColumns(assemblerTableColumns, *instruction, mismatchInfo);
+                    columnsDrawer.PrintAsmInstructionColumns(
+                        assemblerTableColumns,
+                        *instruction,
+                        mismatchInfo,
+                        descriptor.m_imguiStrictness);
                 }
                 else
                 {
@@ -3203,7 +3257,10 @@ void ImGuiApp::PrintAsmInstructionAddress(const AsmInstruction &instruction)
     ImGui::Text("%08x", down_cast<uint32_t>(instruction.address));
 }
 
-void ImGuiApp::PrintAsmInstructionAssembler(const AsmInstruction &instruction, const AsmMismatchInfo &mismatchInfo)
+void ImGuiApp::PrintAsmInstructionAssembler(
+    const AsmInstruction &instruction,
+    const AsmMismatchInfo &mismatchInfo,
+    AsmMatchStrictness strictness)
 {
     if (instruction.isInvalid)
     {
@@ -3213,8 +3270,6 @@ void ImGuiApp::PrintAsmInstructionAssembler(const AsmInstruction &instruction, c
     {
         assert(!instruction.text.empty());
 
-        // #TODO: Make strictness configurable.
-        const AsmMatchStrictness strictness = AsmMatchStrictness::Undecided;
         auto mismatchBits = mismatchInfo.mismatch_bits;
         if (strictness != AsmMatchStrictness::Lenient)
         {
@@ -3229,7 +3284,7 @@ void ImGuiApp::PrintAsmInstructionAssembler(const AsmInstruction &instruction, c
             {
                 if (mismatchBits & (1 << i))
                 {
-                    const ImU32 color = GetMismatchBitColor(mismatchInfo, i);
+                    const ImU32 color = GetMismatchBitColor(mismatchInfo, strictness, i);
                     const auto preTextLen = static_cast<size_t>(textArray[i].data() - instruction.text.data());
                     const std::string_view preText{instruction.text.data(), preTextLen};
                     const ImVec2 textSize = CalcTextSize(preText, true);
@@ -3264,7 +3319,9 @@ void ImGuiApp::PrintAsmInstructionAssembler(const AsmInstruction &instruction, c
     }
 }
 
-void ImGuiApp::ComparisonManagerMatchedFunctionDiffSymbolTable(const AsmComparisonRecords &records)
+void ImGuiApp::ComparisonManagerMatchedFunctionDiffSymbolTable(
+    const AsmComparisonRecords &records,
+    AsmMatchStrictness strictness)
 {
     constexpr ImGuiTableFlags tableFlags =
         ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_SizingFixedFit;
@@ -3286,8 +3343,7 @@ void ImGuiApp::ComparisonManagerMatchedFunctionDiffSymbolTable(const AsmComparis
                 ImGui::TableNextRow();
 
                 const AsmComparisonRecord &record = records[n];
-                // #TODO: Make strictness configurable.
-                const AsmMatchValueEx matchValue = record.mismatch_info.get_match_value_ex(AsmMatchStrictness::Undecided);
+                const AsmMatchValueEx matchValue = record.mismatch_info.get_match_value_ex(strictness);
 
                 ImU32 color = GetAsmMatchValueColor(matchValue);
                 color = CreateColor(color, (n % 2 == 0) ? 112 : 128);
@@ -3437,7 +3493,7 @@ ImU32 ImGuiApp::GetAsmMatchValueColor(AsmMatchValueEx matchValue)
     }
 }
 
-ImU32 ImGuiApp::GetMismatchBitColor(const AsmMismatchInfo &mismatchInfo, int bit)
+ImU32 ImGuiApp::GetMismatchBitColor(const AsmMismatchInfo &mismatchInfo, AsmMatchStrictness strictness, int bit)
 {
     ImU32 color;
 
@@ -3448,8 +3504,6 @@ ImU32 ImGuiApp::GetMismatchBitColor(const AsmMismatchInfo &mismatchInfo, int bit
     else
     {
         assert(mismatchInfo.maybe_mismatch_bits & (1 << bit));
-        // #TODO: Make strictness configurable.
-        const AsmMatchStrictness strictness = AsmMatchStrictness::Undecided;
         assert(strictness != AsmMatchStrictness::Lenient);
         color = strictness == AsmMatchStrictness::Strict ? MismatchBgColor : MaybeMismatchBgColor;
     }

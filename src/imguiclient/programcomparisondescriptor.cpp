@@ -544,6 +544,11 @@ bool ProgramComparisonDescriptor::bundles_ready() const
     return count == m_files.size();
 }
 
+const NamedFunction &ProgramComparisonDescriptor::get_named_function(Side side, IndexT index) const
+{
+    return m_files[side].m_revisionDescriptor->m_namedFunctions[index];
+}
+
 span<const IndexT> ProgramComparisonDescriptor::get_matched_function_indices() const
 {
     assert(m_files[0].get_matched_function_indices().size() == m_files[1].get_matched_function_indices().size());
@@ -627,6 +632,9 @@ void ProgramComparisonDescriptor::update_all_bundle_ui_infos()
     // Potentially is more expensive than we would like it to be.
     // We try to keep calls to a minimum.
 
+    const bool strictnessChanged = m_strictnessUsedForUpdateBundleUiInfos != m_imguiStrictness;
+    m_strictnessUsedForUpdateBundleUiInfos = m_imguiStrictness;
+
     for (IndexT fileIdx = 0; fileIdx < 2; ++fileIdx)
     {
         File &file = m_files[fileIdx];
@@ -646,7 +654,7 @@ void ProgramComparisonDescriptor::update_all_bundle_ui_infos()
                     continue;
 
                 File::NamedFunctionBundleUiInfo &uiInfo = bundleUiInfos[bundleIdx];
-                if (uiInfo.m_similarity.has_value())
+                if (!strictnessChanged && uiInfo.m_similarity.has_value())
                     continue;
 
                 const FunctionsSimilarityReport report = build_function_similarity_report({bundle.matchedFunctionIndices});
@@ -678,8 +686,7 @@ ProgramComparisonDescriptor::FunctionsSimilarityReport ProgramComparisonDescript
             report.totalSimilarity = std::nullopt;
             break;
         }
-        // #TODO: Make strictness configurable.
-        report.totalSimilarity.value() += matchedFunction.comparison.get_similarity_as_int(AsmMatchStrictness::Lenient);
+        report.totalSimilarity.value() += matchedFunction.comparison.get_similarity_as_int(m_imguiStrictness);
     }
     return report;
 }
@@ -697,8 +704,7 @@ void ProgramComparisonDescriptor::update_matched_named_function_ui_infos(span<co
             File &file = m_files[i];
             File::NamedFunctionUiInfo &uiInfo = file.m_namedFunctionUiInfos[namedFunctionIndex];
             const NamedFunction &namedFunction = file.m_revisionDescriptor->m_namedFunctions[namedFunctionIndex];
-            // #TODO: Make strictness configurable.
-            const int8_t similarity = matchedFunction.comparison.get_similarity_as_int(AsmMatchStrictness::Lenient);
+            const int8_t similarity = matchedFunction.comparison.get_similarity_as_int(m_imguiStrictness);
             uiInfo.update_info(namedFunction.name, namedFunction.id, true, similarity);
         }
     }
