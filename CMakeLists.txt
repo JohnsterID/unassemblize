@@ -187,6 +187,7 @@ target_sources(unassemblize PRIVATE
     src/imguiclient/imconfig.h # TODO: Is this file actually used?
     src/imguiclient/imguiapp.cpp
     src/imguiclient/imguiapp.h
+    src/imguiclient/imguiapptypes.h
     src/imguiclient/processedstate.cpp
     src/imguiclient/processedstate.h
     src/imguiclient/programcomparisondescriptor.cpp

@@ -37,6 +37,18 @@ enum class AsmMatchStrictness
     Undecided, // Unknown to known/unknown symbol pairs are treated as undecided, maybe match or mismatch.
     Strict, // Unknown to known/unknown symbol pairs are treated as mismatch.
 };
+inline constexpr size_t AsmMatchStrictnessCount = 3;
+
+inline constexpr std::array<const char *, AsmMatchStrictnessCount> s_asmMatchStrictnessNames = {
+    "Lenient",
+    "Undecided",
+    "Strict"};
+
+inline constexpr const char *to_string(AsmMatchStrictness strictness)
+{
+    return s_asmMatchStrictnessNames[static_cast<size_t>(strictness)];
+}
+AsmMatchStrictness to_asm_match_strictness(std::string_view str);
 
 enum class AsmMatchValue
 {
@@ -111,8 +123,6 @@ std::optional<ptrdiff_t> get_record_distance(
     Side side,
     Address64T address1,
     Address64T address2);
-
-AsmMatchStrictness to_asm_match_strictness(std::string_view str);
 
 struct AsmComparisonResult
 {

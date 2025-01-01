@@ -47,10 +47,9 @@ void TextUnformattedCenteredX(std::string_view view, float width_x = 0.f);
 
 void TooltipText(const char *fmt, ...);
 void TooltipTextV(const char *fmt, va_list args);
-void TooltipTextUnformatted(const char *text, const char *text_end = nullptr);
 void TooltipTextUnformatted(std::string_view view);
 void TooltipTextMarker(const char *fmt, ...);
-void TooltipTextUnformattedMarker(const char *text, const char *text_end = nullptr);
+void TooltipTextUnformattedMarker(std::string_view view);
 
 void MoveCursorScreenPos(float x, float y);
 

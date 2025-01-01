@@ -13,6 +13,7 @@
 #pragma once
 
 #include "asyncworkstate.h"
+#include "imguiapptypes.h"
 #include "processedstate.h"
 #include "programfilecommon.h"
 #include "utility/imgui_text_filter.h"
@@ -21,6 +22,44 @@
 
 namespace unassemblize::gui
 {
+struct AssemblerTableColumnSettings
+{
+    AssemblerTableColumnSettings()
+    {
+        m_show[(int)AssemblerTableColumn::SourceLine] = true;
+        m_show[(int)AssemblerTableColumn::SourceCode] = true;
+        m_show[(int)AssemblerTableColumn::Bytes] = true;
+        m_show[(int)AssemblerTableColumn::Address] = true;
+        m_show[(int)AssemblerTableColumn::Jumps] = false;
+        m_show[(int)AssemblerTableColumn::Assembler] = true;
+
+        m_useCustomWidth[(int)AssemblerTableColumn::SourceLine] = false;
+        m_useCustomWidth[(int)AssemblerTableColumn::SourceCode] = true;
+        m_useCustomWidth[(int)AssemblerTableColumn::Bytes] = true;
+        m_useCustomWidth[(int)AssemblerTableColumn::Address] = false;
+        m_useCustomWidth[(int)AssemblerTableColumn::Jumps] = false;
+        m_useCustomWidth[(int)AssemblerTableColumn::Assembler] = true;
+
+        m_customWidth[(int)AssemblerTableColumn::SourceLine] = 10;
+        m_customWidth[(int)AssemblerTableColumn::SourceCode] = 300;
+        m_customWidth[(int)AssemblerTableColumn::Bytes] = 100;
+        m_customWidth[(int)AssemblerTableColumn::Address] = 10;
+        m_customWidth[(int)AssemblerTableColumn::Jumps] = 10;
+        m_customWidth[(int)AssemblerTableColumn::Assembler] = 300;
+    }
+
+    bool show(AssemblerTableColumn column) const { return m_show[(int)column]; }
+
+    float custom_width(AssemblerTableColumn column) const
+    {
+        return static_cast<float>(m_useCustomWidth[(int)column] ? m_customWidth[(int)column] : 0);
+    }
+
+    std::array<bool, AssemblerTableColumnCount> m_show;
+    std::array<bool, AssemblerTableColumnCount> m_useCustomWidth;
+    std::array<int, AssemblerTableColumnCount> m_customWidth;
+};
+
 struct ProgramComparisonDescriptor
 {
     struct File
@@ -183,6 +222,8 @@ struct ProgramComparisonDescriptor
     bool matched_functions_built() const;
     bool bundles_ready() const;
 
+    void on_match_strictness_changed();
+
     const NamedFunction &get_named_function(Side side, IndexT index) const;
 
     span<const IndexT> get_matched_function_indices() const; // Links to MatchedFunctions.
@@ -213,6 +254,10 @@ struct ProgramComparisonDescriptor
 
     // UI OPTIONS. IS NOT RESET ON REBUILD.
 
+    // Customize how the assembler table columns show.
+    AssemblerTableColumnSettings m_imguiAssemblerTableColumnSettings;
+
+    // Set match strictness for instruction comparisons.
     AsmMatchStrictness m_imguiStrictness = AsmMatchStrictness::Undecided;
 
     // Selected functions in pages.
@@ -221,7 +266,8 @@ struct ProgramComparisonDescriptor
 
     bool m_imguiProcessMatchedFunctionsImmediately = false;
     bool m_imguiProcessUnmatchedFunctionsImmediately = false;
-    bool m_imguiHasOpenWindow = true;
+    bool m_imguiSettingsWindowOpened = false;
+    bool m_imguiComparisonWindowOpened = true;
 
     // BUILT CONTENTS. IS RESET ON REBUILD.
 

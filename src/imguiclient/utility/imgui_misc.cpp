@@ -90,20 +90,15 @@ void TooltipTextV(const char *fmt, va_list args)
     }
 }
 
-void TooltipTextUnformatted(const char *text, const char *text_end)
+void TooltipTextUnformatted(std::string_view view)
 {
     if (ImGui::BeginItemTooltip())
     {
         ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
-        ImGui::TextUnformatted(text, text_end);
+        TextUnformatted(view);
         ImGui::PopTextWrapPos();
         ImGui::EndTooltip();
     }
-}
-
-void TooltipTextUnformatted(std::string_view view)
-{
-    TooltipTextUnformatted(view.data(), view.data() + view.size());
 }
 
 void TooltipTextMarker(const char *fmt, ...)
@@ -115,10 +110,10 @@ void TooltipTextMarker(const char *fmt, ...)
     va_end(args);
 }
 
-void TooltipTextUnformattedMarker(const char *text, const char *text_end)
+void TooltipTextUnformattedMarker(std::string_view view)
 {
     ImGui::TextDisabled("(?)");
-    TooltipTextUnformatted(text, text_end);
+    TooltipTextUnformatted(view);
 }
 
 void MoveCursorScreenPos(float x, float y)

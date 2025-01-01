@@ -544,6 +544,15 @@ bool ProgramComparisonDescriptor::bundles_ready() const
     return count == m_files.size();
 }
 
+void ProgramComparisonDescriptor::on_match_strictness_changed()
+{
+    if (bundles_ready())
+    {
+        update_matched_named_function_ui_infos(get_matched_function_indices());
+        update_all_bundle_ui_infos();
+    }
+}
+
 const NamedFunction &ProgramComparisonDescriptor::get_named_function(Side side, IndexT index) const
 {
     return m_files[side].m_revisionDescriptor->m_namedFunctions[index];
@@ -696,7 +705,8 @@ void ProgramComparisonDescriptor::update_matched_named_function_ui_infos(span<co
     for (IndexT matchedFunctionIndex : matchedFunctionIndices)
     {
         const MatchedFunction &matchedFunction = m_matchedFunctions[matchedFunctionIndex];
-        assert(matchedFunction.is_compared());
+        if (!matchedFunction.is_compared())
+            continue;
 
         for (IndexT i = 0; i < 2; ++i)
         {

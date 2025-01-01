@@ -12,6 +12,8 @@
  */
 #pragma once
 
+#include "imguiapptypes.h"
+
 #include "utility/imgui_misc.h"
 #include "utility/imgui_text_filter.h"
 
@@ -50,6 +52,7 @@ class ImGuiApp
         ImGuiTableFlags_ScrollY;
 
     static constexpr ImGuiTableFlags ComparisonSplitTableFlags =
+        ImGuiTableFlags_NoSavedSettings |
         ImGuiTableFlags_SizingStretchSame |
         ImGuiTableFlags_NoBordersInBody |
         ImGuiTableFlags_NoPadOuterX;
@@ -86,16 +89,6 @@ class ImGuiApp
 
     using ProgramFileDescriptorPair = std::array<ProgramFileDescriptor *, 2>;
 
-    enum class AssemblerTableColumn : uint8_t
-    {
-        SourceLine,
-        SourceCode,
-        Bytes,
-        Address,
-        Jumps,
-        Assembler,
-    };
-
     // Class to help draw the assembler table columns. The default column order is different on left and right panes.
     class AssemblerTableColumnsDrawer
     {
@@ -114,7 +107,9 @@ class ImGuiApp
             const AsmComparisonRecords &records,
             Side side);
 
-        static void SetupColumns(const std::vector<AssemblerTableColumn> &columns);
+        static void SetupColumns(
+            const std::vector<AssemblerTableColumn> &columns,
+            const AssemblerTableColumnSettings &settings);
 
         void PrintAsmInstructionColumns(
             const std::vector<AssemblerTableColumn> &columns,
@@ -123,7 +118,7 @@ class ImGuiApp
             AsmMatchStrictness strictness = AsmMatchStrictness::Undecided);
 
     private:
-        static void SetupColumn(AssemblerTableColumn column);
+        static void SetupColumn(AssemblerTableColumn column, bool defaultShow, float initWidth);
 
         void PrintAsmInstructionColumn(
             AssemblerTableColumn column,
@@ -295,6 +290,9 @@ private:
 
     void OutputManagerBody();
 
+    void ComparisonManagerSettings(ProgramComparisonDescriptor &descriptor);
+    void ComparisonManagerMatchStrictnessSettings(ProgramComparisonDescriptor &descriptor);
+    void ComparisonManagerAssemblerTableColumnSettings(ProgramComparisonDescriptor &descriptor);
     void ComparisonManagerMenu(ProgramComparisonDescriptor &descriptor);
     void ComparisonManagerBody(ProgramComparisonDescriptor &descriptor);
     void ComparisonManagerFilesHeaders();
@@ -340,11 +338,13 @@ private:
     static void ComparisonManagerNamedFunction(
         Side side,
         const ProgramFileRevisionDescriptor &fileRevision,
-        const NamedFunction &namedFunction);
+        const NamedFunction &namedFunction,
+        const AssemblerTableColumnSettings &columnSettings);
     static void ComparisonManagerNamedFunctionContentTable(
         Side side,
         const ProgramFileRevisionDescriptor &fileRevision,
-        const NamedFunction &namedFunction);
+        const NamedFunction &namedFunction,
+        const AssemblerTableColumnSettings &columnSettings);
 
     static bool PrintAsmInstructionSourceLine(const AsmInstruction &instruction, const TextFileContent &fileContent);
     static bool PrintAsmInstructionSourceCode(const AsmInstruction &instruction, const TextFileContent &fileContent);

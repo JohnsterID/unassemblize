@@ -39,11 +39,13 @@ ImGuiApp::AssemblerTableColumnsDrawer::AssemblerTableColumnsDrawer(
 {
 }
 
-void ImGuiApp::AssemblerTableColumnsDrawer::SetupColumns(const std::vector<AssemblerTableColumn> &columns)
+void ImGuiApp::AssemblerTableColumnsDrawer::SetupColumns(
+    const std::vector<AssemblerTableColumn> &columns,
+    const AssemblerTableColumnSettings &settings)
 {
     for (AssemblerTableColumn column : columns)
     {
-        SetupColumn(column);
+        SetupColumn(column, settings.show(column), settings.custom_width(column));
     }
 }
 
@@ -60,29 +62,14 @@ void ImGuiApp::AssemblerTableColumnsDrawer::PrintAsmInstructionColumns(
     }
 }
 
-void ImGuiApp::AssemblerTableColumnsDrawer::SetupColumn(AssemblerTableColumn column)
+void ImGuiApp::AssemblerTableColumnsDrawer::SetupColumn(AssemblerTableColumn column, bool defaultShow, float initWidth)
 {
-    switch (column)
+    ImGuiTableColumnFlags flags = ImGuiTableColumnFlags_WidthFixed;
+    if (!defaultShow)
     {
-        case AssemblerTableColumn::SourceLine:
-            ImGui::TableSetupColumn("Line");
-            break;
-        case AssemblerTableColumn::SourceCode:
-            ImGui::TableSetupColumn("Source Code");
-            break;
-        case AssemblerTableColumn::Bytes:
-            ImGui::TableSetupColumn("Bytes");
-            break;
-        case AssemblerTableColumn::Address:
-            ImGui::TableSetupColumn("Address");
-            break;
-        case AssemblerTableColumn::Jumps:
-            ImGui::TableSetupColumn("Jumps", ImGuiTableColumnFlags_DefaultHide);
-            break;
-        case AssemblerTableColumn::Assembler:
-            ImGui::TableSetupColumn("Assembler");
-            break;
+        flags |= ImGuiTableColumnFlags_DefaultHide;
     }
+    ImGui::TableSetupColumn(to_string(column), flags, initWidth);
 }
 
 void ImGuiApp::AssemblerTableColumnsDrawer::PrintAsmInstructionColumn(
@@ -92,17 +79,20 @@ void ImGuiApp::AssemblerTableColumnsDrawer::PrintAsmInstructionColumn(
     AsmMatchStrictness strictness)
 {
     // Note: Must always print a character in a row to satisfy the ImGui clipper.
+    // The file content is loaded asynchronously and can arrive later.
 
     switch (column)
     {
         case AssemblerTableColumn::SourceLine:
-            assert(m_fileContent != nullptr);
-            if (!ImGuiApp::PrintAsmInstructionSourceLine(instruction, *m_fileContent))
+            if (m_fileContent == nullptr)
+                TextUnformatted(" ");
+            else if (!ImGuiApp::PrintAsmInstructionSourceLine(instruction, *m_fileContent))
                 TextUnformatted(" ");
             break;
         case AssemblerTableColumn::SourceCode:
-            assert(m_fileContent != nullptr);
-            if (!ImGuiApp::PrintAsmInstructionSourceCode(instruction, *m_fileContent))
+            if (m_fileContent == nullptr)
+                TextUnformatted(" ");
+            else if (!ImGuiApp::PrintAsmInstructionSourceCode(instruction, *m_fileContent))
                 TextUnformatted(" ");
             break;
         case AssemblerTableColumn::Bytes:
@@ -214,7 +204,7 @@ std::optional<ptrdiff_t> ImGuiApp::AssemblerTableColumnsDrawer::GetDistance(Addr
 
 std::string ImGuiApp::s_textBuffer1024;
 
-const std::vector<ImGuiApp::AssemblerTableColumn> ImGuiApp::s_assemblerTableColumnsLeft = {
+const std::vector<AssemblerTableColumn> ImGuiApp::s_assemblerTableColumnsLeft = {
     AssemblerTableColumn::SourceLine,
     AssemblerTableColumn::SourceCode,
     AssemblerTableColumn::Bytes,
@@ -222,7 +212,7 @@ const std::vector<ImGuiApp::AssemblerTableColumn> ImGuiApp::s_assemblerTableColu
     AssemblerTableColumn::Jumps,
     AssemblerTableColumn::Assembler};
 
-const std::vector<ImGuiApp::AssemblerTableColumn> ImGuiApp::s_assemblerTableColumnsRight = {
+const std::vector<AssemblerTableColumn> ImGuiApp::s_assemblerTableColumnsRight = {
     AssemblerTableColumn::Address,
     AssemblerTableColumn::Jumps,
     AssemblerTableColumn::Assembler,
@@ -230,13 +220,13 @@ const std::vector<ImGuiApp::AssemblerTableColumn> ImGuiApp::s_assemblerTableColu
     AssemblerTableColumn::SourceLine,
     AssemblerTableColumn::SourceCode};
 
-const std::vector<ImGuiApp::AssemblerTableColumn> ImGuiApp::s_assemblerTableColumnsLeft_NoSource = {
+const std::vector<AssemblerTableColumn> ImGuiApp::s_assemblerTableColumnsLeft_NoSource = {
     AssemblerTableColumn::Bytes,
     AssemblerTableColumn::Address,
     AssemblerTableColumn::Jumps,
     AssemblerTableColumn::Assembler};
 
-const std::vector<ImGuiApp::AssemblerTableColumn> ImGuiApp::s_assemblerTableColumnsRight_NoSource = {
+const std::vector<AssemblerTableColumn> ImGuiApp::s_assemblerTableColumnsRight_NoSource = {
     AssemblerTableColumn::Address,
     AssemblerTableColumn::Jumps,
     AssemblerTableColumn::Assembler,
@@ -1290,7 +1280,9 @@ void ImGuiApp::update_closed_program_comparisons()
         std::remove_if(
             m_programComparisons.begin(),
             m_programComparisons.end(),
-            [](const ProgramComparisonDescriptorPtr &p) { return !p->m_imguiHasOpenWindow && !p->has_async_work(); }),
+            [](const ProgramComparisonDescriptorPtr &p) {
+                return !p->m_imguiComparisonWindowOpened && !p->has_async_work();
+            }),
         m_programComparisons.end());
 }
 
@@ -1452,16 +1444,32 @@ void ImGuiApp::ComparisonManagerWindows()
     {
         ProgramComparisonDescriptor &descriptor = *m_programComparisons[i];
 
-        const std::string title = fmt::format("Assembler Comparison {:d}", descriptor.m_id);
-
-        ImGui::SetNextWindowSizeConstraints(ImVec2(400, 300), ImVec2(FLT_MAX, FLT_MAX));
-
-        ImScoped::Window window(title.c_str(), &descriptor.m_imguiHasOpenWindow, ImGuiWindowFlags_MenuBar);
-        ImScoped::ID id(i);
-        if (window.IsContentVisible)
+        if (descriptor.m_imguiComparisonWindowOpened)
         {
-            ComparisonManagerMenu(descriptor);
-            ComparisonManagerBody(descriptor);
+            // Main window
+            {
+                const std::string title = fmt::format("Assembler Comparison {:d}", descriptor.m_id);
+                ImGui::SetNextWindowSizeConstraints(ImVec2(400, 300), ImVec2(FLT_MAX, FLT_MAX));
+                ImScoped::Window window(title.c_str(), &descriptor.m_imguiComparisonWindowOpened, ImGuiWindowFlags_MenuBar);
+                if (window.IsContentVisible)
+                {
+                    ImScoped::ID id(i);
+                    ComparisonManagerMenu(descriptor);
+                    ComparisonManagerBody(descriptor);
+                }
+            }
+
+            if (descriptor.m_imguiSettingsWindowOpened)
+            {
+                const std::string title = fmt::format("Assembler Comparison {:d} Settings", descriptor.m_id);
+                ImGui::SetNextWindowSizeConstraints(ImVec2(400, 300), ImVec2(FLT_MAX, FLT_MAX));
+                ImScoped::Window window(title.c_str(), &descriptor.m_imguiSettingsWindowOpened);
+                if (window.IsContentVisible)
+                {
+                    ImScoped::ID id(i);
+                    ComparisonManagerSettings(descriptor);
+                }
+            }
         }
     }
 
@@ -1541,7 +1549,9 @@ void ImGuiApp::FileManagerBody()
                 // Tooltip on hover tab.
                 const std::string exe_name = descriptor.create_short_exe_name();
                 if (!exe_name.empty())
+                {
                     TooltipTextUnformatted(exe_name);
+                }
             }
             else
             {
@@ -1578,7 +1588,7 @@ void ImGuiApp::FileManagerDescriptor(ProgramFileDescriptor &descriptor, bool &er
     {
         ImScoped::Group group;
         ImScoped::Disabled disabled(descriptor.has_async_work());
-        ImScoped::ItemWidth item_width(ImGui::GetFontSize() * -12);
+        ImScoped::ItemWidth itemWidth(ImGui::GetFontSize() * -12);
 
         FileManagerDescriptorExeFile(descriptor);
 
@@ -2340,6 +2350,87 @@ void ImGuiApp::OutputManagerBody()
     ImGui::TextUnformatted("Not implemented");
 }
 
+void ImGuiApp::ComparisonManagerSettings(ProgramComparisonDescriptor &descriptor)
+{
+    if (ImGui::BeginTabBar("settings_tabs"))
+    {
+        if (ImGui::BeginTabItem("Assembler Table Columns"))
+        {
+            ComparisonManagerAssemblerTableColumnSettings(descriptor);
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Match Strictness"))
+        {
+            ComparisonManagerMatchStrictnessSettings(descriptor);
+            ImGui::EndTabItem();
+        }
+
+        ImGui::EndTabBar();
+    }
+}
+
+void ImGuiApp::ComparisonManagerMatchStrictnessSettings(ProgramComparisonDescriptor &descriptor)
+{
+    ImScoped::ItemWidth itemWidth(ImGui::GetFontSize() * -12);
+    {
+        ImScoped::Combo combo("Match Strictness", to_string(descriptor.m_imguiStrictness));
+        if (combo.IsOpen)
+        {
+            for (IndexT n = 0; n < s_asmMatchStrictnessNames.size(); ++n)
+            {
+                const AsmMatchStrictness strictness = static_cast<AsmMatchStrictness>(n);
+                const bool selected = descriptor.m_imguiStrictness == strictness;
+                if (ImGui::Selectable(s_asmMatchStrictnessNames[n], selected))
+                {
+                    if (descriptor.m_imguiStrictness != strictness)
+                    {
+                        descriptor.m_imguiStrictness = strictness;
+                        descriptor.on_match_strictness_changed();
+                    }
+                }
+            }
+        }
+    }
+    ImGui::SameLine();
+    TooltipTextUnformattedMarker(
+        "The match strictness determines how unknown symbols are compared. "
+        "If lenient, then unknown symbols are considered a match. "
+        "If strict, then unknown symbols are considered a mismatch.");
+}
+
+void ImGuiApp::ComparisonManagerAssemblerTableColumnSettings(ProgramComparisonDescriptor &descriptor)
+{
+    ImScoped::ItemWidth itemWidth(ImGui::GetFontSize() * -12);
+
+    for (size_t i = 0; i < AssemblerTableColumnCount; ++i)
+    {
+        bool *show = &descriptor.m_imguiAssemblerTableColumnSettings.m_show[i];
+        bool *useCustomWidth = &descriptor.m_imguiAssemblerTableColumnSettings.m_useCustomWidth[i];
+        int *customWidth = &descriptor.m_imguiAssemblerTableColumnSettings.m_customWidth[i];
+
+        ImScoped::ID id(i);
+
+        ImGui::Text("%s:", to_string(AssemblerTableColumn(i)));
+        ImGui::Indent();
+
+        ImGui::Checkbox("Default show", show);
+        ImGui::SameLine();
+        TooltipTextUnformattedMarker(
+            "When enabled, then this column is shown by default when a table is shown for the first time.");
+
+        ImGui::Checkbox("Use custom width", useCustomWidth);
+        ImGui::SameLine();
+        TooltipTextUnformattedMarker(
+            "When enabled, then this column width is set to the custom width, "
+            "otherwise is set to its (immediate) contents width.");
+        {
+            ImScoped::Disabled disabled(!*useCustomWidth);
+            ImGui::SliderInt("Custom width", customWidth, 10, 1000, "%d", ImGuiSliderFlags_AlwaysClamp);
+        }
+        ImGui::Unindent();
+    }
+}
+
 void ImGuiApp::ComparisonManagerMenu(ProgramComparisonDescriptor &descriptor)
 {
     if (ImGui::BeginMenuBar())
@@ -2351,32 +2442,27 @@ void ImGuiApp::ComparisonManagerMenu(ProgramComparisonDescriptor &descriptor)
 
         if (ImGui::BeginMenu("View"))
         {
-            if (ImGui::BeginMenu("Strictness"))
+            if (ImGui::BeginMenu("Match Strictness"))
             {
                 const AsmMatchStrictness strictness = descriptor.m_imguiStrictness;
-                const bool isLenient = strictness == AsmMatchStrictness::Lenient;
-                const bool isUndecided = strictness == AsmMatchStrictness::Undecided;
-                const bool isStrict = strictness == AsmMatchStrictness::Strict;
 
-                if (ImGui::MenuItem("Lenient", nullptr, isLenient))
+                for (size_t i = 0; i < AsmMatchStrictnessCount; ++i)
                 {
-                    descriptor.m_imguiStrictness = AsmMatchStrictness::Lenient;
-                }
-                if (ImGui::MenuItem("Undecided", nullptr, isUndecided))
-                {
-                    descriptor.m_imguiStrictness = AsmMatchStrictness::Undecided;
-                }
-                if (ImGui::MenuItem("Strict", nullptr, isStrict))
-                {
-                    descriptor.m_imguiStrictness = AsmMatchStrictness::Strict;
-                }
-                if (descriptor.m_imguiStrictness != strictness)
-                {
-                    descriptor.update_matched_named_function_ui_infos(descriptor.get_matched_function_indices());
-                    descriptor.update_all_bundle_ui_infos();
+                    const auto strictness = static_cast<AsmMatchStrictness>(i);
+                    const bool isSet = descriptor.m_imguiStrictness == AsmMatchStrictness(i);
+                    if (ImGui::MenuItem(to_string(strictness), nullptr, isSet))
+                    {
+                        if (strictness != descriptor.m_imguiStrictness)
+                        {
+                            descriptor.m_imguiStrictness = strictness;
+                            descriptor.on_match_strictness_changed();
+                        }
+                    }
                 }
                 ImGui::EndMenu();
             }
+
+            ImGui::MenuItem("Open Settings", nullptr, &descriptor.m_imguiSettingsWindowOpened);
 
             ImGui::EndMenu();
         }
@@ -2502,9 +2588,12 @@ void ImGuiApp::ComparisonManagerFilesCompareButton(ProgramComparisonDescriptor &
     ProgramFileDescriptor *fileDescriptor0 = get_program_file_descriptor(selectedFileIdx0);
     ProgramFileDescriptor *fileDescriptor1 = get_program_file_descriptor(selectedFileIdx1);
 
-    const bool canCompare0 = fileDescriptor0 && (fileDescriptor0->can_load() || fileDescriptor0->exe_loaded());
-    const bool canCompare1 = fileDescriptor1 && (fileDescriptor1->can_load() || fileDescriptor1->exe_loaded());
-    ImScoped::Disabled disabled(!(canCompare0 && canCompare1));
+    const bool canCompare0 = fileDescriptor0 && (fileDescriptor0->can_load() || fileDescriptor0->exe_loaded())
+        && !fileDescriptor0->has_async_work();
+    const bool canCompare1 = fileDescriptor1 && (fileDescriptor1->can_load() || fileDescriptor1->exe_loaded())
+        && !fileDescriptor1->has_async_work();
+
+    ImScoped::Disabled disabled(!canCompare0 || !canCompare1);
     // Change button color.
     ImScoped::StyleColor color1(ImGuiCol_Button, (ImVec4)ImColor::HSV(0.5f, 0.6f, 0.6f));
     ImScoped::StyleColor color2(ImGuiCol_ButtonHovered, (ImVec4)ImColor::HSV(0.5f, 0.8f, 0.8f));
@@ -2593,7 +2682,7 @@ void ImGuiApp::ComparisonManagerBundlesSettings(ProgramComparisonDescriptor &des
         for (size_t i = 0; i < 2; ++i)
         {
             ImGui::TableSetColumnIndex(i);
-            ImScoped::ItemWidth item_width(ImGui::GetFontSize() * -12);
+            ImScoped::ItemWidth itemWidth(ImGui::GetFontSize() * -12);
             ImScoped::ID id(i);
 
             ProgramComparisonDescriptor::File &file = descriptor.m_files[i];
@@ -2623,7 +2712,7 @@ void ImGuiApp::ComparisonManagerBundlesTypeSelection(ProgramComparisonDescriptor
     ImScoped::Combo combo("Select Bundle Type", preview);
     if (combo.IsOpen)
     {
-        for (IndexT n = 0; n < count; n++)
+        for (IndexT n = 0; n < count; ++n)
         {
             const bool selected = (index == n);
             if (ImGui::Selectable(options[n], selected))
@@ -2755,7 +2844,7 @@ void ImGuiApp::ComparisonManagerFunctionsSettings(ProgramComparisonDescriptor &d
         for (size_t i = 0; i < 2; ++i)
         {
             ImGui::TableSetColumnIndex(i);
-            ImScoped::ItemWidth item_width(ImGui::GetFontSize() * -12);
+            ImScoped::ItemWidth itemWidth(ImGui::GetFontSize() * -12);
             ImScoped::ID id(i);
 
             ProgramComparisonDescriptor::File &file = descriptor.m_files[i];
@@ -2773,7 +2862,17 @@ void ImGuiApp::ComparisonManagerFunctionsFilter(
 
     selectionChanged |= ImGui::Checkbox("Show Matched Functions", &file.m_imguiShowMatchedFunctions);
     ImGui::SameLine();
+    TooltipTextUnformattedMarker(
+        "Show all matched functions. "
+        "Matched functions are those that exist on both sides with the same name.");
+
+    ImGui::SameLine();
+
     selectionChanged |= ImGui::Checkbox("Show Unmatched Functions", &file.m_imguiShowUnmatchedFunctions);
+    ImGui::SameLine();
+    TooltipTextUnformattedMarker(
+        "Show all unmatched functions. "
+        "Unmatched functions are those that do not exist on the other side.");
 
     if (selectionChanged)
     {
@@ -3091,10 +3190,7 @@ void ImGuiApp::ComparisonManagerMatchedFunctionContentTable(
     ImScoped::Table table("function_assembler_table", assemblerTableColumns.size(), AssemblerTableFlags, tableSize);
     if (table.IsContentVisible)
     {
-        // #TODO: Add feature to auto hide columns by default.
-        // #TODO: Add feature to change default or current width of columns.
-
-        columnsDrawer.SetupColumns(assemblerTableColumns);
+        columnsDrawer.SetupColumns(assemblerTableColumns, descriptor.m_imguiAssemblerTableColumnSettings);
 
         ImGui::TableHeadersRow();
 
@@ -3165,7 +3261,7 @@ void ImGuiApp::ComparisonManagerNamedFunctions(
 
         if (tree.IsOpen)
         {
-            ComparisonManagerNamedFunction(side, revision, namedFunction);
+            ComparisonManagerNamedFunction(side, revision, namedFunction, descriptor.m_imguiAssemblerTableColumnSettings);
         }
     }
 }
@@ -3173,7 +3269,8 @@ void ImGuiApp::ComparisonManagerNamedFunctions(
 void ImGuiApp::ComparisonManagerNamedFunction(
     Side side,
     const ProgramFileRevisionDescriptor &fileRevision,
-    const NamedFunction &namedFunction)
+    const NamedFunction &namedFunction,
+    const AssemblerTableColumnSettings &columnSettings)
 {
     assert(namedFunction.is_disassembled());
 
@@ -3211,7 +3308,7 @@ void ImGuiApp::ComparisonManagerNamedFunction(
             ImGui::TableNextRow();
 
             ImGui::TableSetColumnIndex(side == Side::LeftSide ? 0 : 2);
-            ComparisonManagerNamedFunctionContentTable(side, fileRevision, namedFunction);
+            ComparisonManagerNamedFunctionContentTable(side, fileRevision, namedFunction, columnSettings);
         }
     }
 }
@@ -3219,7 +3316,8 @@ void ImGuiApp::ComparisonManagerNamedFunction(
 void ImGuiApp::ComparisonManagerNamedFunctionContentTable(
     Side side,
     const ProgramFileRevisionDescriptor &fileRevision,
-    const NamedFunction &namedFunction)
+    const NamedFunction &namedFunction,
+    const AssemblerTableColumnSettings &columnSettings)
 {
     const AsmInstructions &instructions = namedFunction.function.get_instructions();
     const std::string &sourceFile = namedFunction.function.get_source_file_name();
@@ -3235,9 +3333,11 @@ void ImGuiApp::ComparisonManagerNamedFunctionContentTable(
 
     if (table.IsContentVisible)
     {
-        ImGui::TableSetupScrollFreeze(0, 1); // Makes top row always visible.
+        // While it is technically possible to make the top row always visible,
+        // it is not done here to make it consistent with the matched function tables,
+        // where it is unfortunately not possible to do.
 
-        columnsDrawer.SetupColumns(assemblerTableColumns);
+        columnsDrawer.SetupColumns(assemblerTableColumns, columnSettings);
 
         ImGui::TableHeadersRow();
 
@@ -3510,7 +3610,7 @@ void ImGuiApp::TreeNodeHeaderStyleColor(ScopedStyleColor &styleColor)
     styleColor.Push(ImGuiCol_HeaderActive, IM_COL32(0xDB, 0x61, 0x40, 255));
 }
 
-const std::vector<ImGuiApp::AssemblerTableColumn> &ImGuiApp::GetAssemblerTableColumns(Side side, bool showSourceCodeColumns)
+const std::vector<AssemblerTableColumn> &ImGuiApp::GetAssemblerTableColumns(Side side, bool showSourceCodeColumns)
 {
     switch (side)
     {

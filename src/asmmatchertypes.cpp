@@ -15,6 +15,19 @@
 
 namespace unassemblize
 {
+AsmMatchStrictness to_asm_match_strictness(std::string_view str)
+{
+    for (size_t i = 0; i < AsmMatchStrictnessCount; ++i)
+    {
+        if (util::equals_nocase(str, to_string(AsmMatchStrictness(i))))
+        {
+            return AsmMatchStrictness(i);
+        }
+    }
+    printf("Unrecognized asm match to_asm_match_strictness '%.*s'. Defaulting to 'Undecided'", PRINTF_STRING(str));
+    return AsmMatchStrictness::Undecided;
+}
+
 AsmMatchValue AsmMismatchInfo::get_match_value(AsmMatchStrictness strictness) const
 {
     switch (strictness)
@@ -136,27 +149,6 @@ std::optional<ptrdiff_t> get_record_distance(
         }
     }
     return std::nullopt;
-}
-
-AsmMatchStrictness to_asm_match_strictness(std::string_view str)
-{
-    if (util::equals_nocase(str, "lenient"))
-    {
-        return AsmMatchStrictness::Lenient;
-    }
-    else if (util::equals_nocase(str, "undecided"))
-    {
-        return AsmMatchStrictness::Undecided;
-    }
-    else if (util::equals_nocase(str, "strict"))
-    {
-        return AsmMatchStrictness::Strict;
-    }
-    else
-    {
-        printf("Unrecognized asm match to_asm_match_strictness '%.*s'. Defaulting to 'Undecided'", PRINTF_STRING(str));
-        return AsmMatchStrictness::Undecided;
-    }
 }
 
 uint32_t AsmComparisonResult::get_instruction_count() const
