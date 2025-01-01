@@ -106,12 +106,12 @@ class ImGuiApp
         explicit AssemblerTableColumnsDrawer(
             const NamedFunction &namedFunction,
             const TextFileContent *fileContent,
-            const AsmInstructions *instructions);
+            const AsmInstructions &instructions);
 
         explicit AssemblerTableColumnsDrawer(
             const NamedFunction &namedFunction,
             const TextFileContent *fileContent,
-            const AsmComparisonRecords *records,
+            const AsmComparisonRecords &records,
             Side side);
 
         static void SetupColumns(const std::vector<AssemblerTableColumn> &columns);

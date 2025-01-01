@@ -242,17 +242,20 @@ int8_t AsmComparisonResult::get_max_similarity_as_int(AsmMatchStrictness strictn
 
 bool NamedFunction::is_disassembled() const
 {
-    return !function.get_instructions().empty();
+    if (isDisassembled)
+    {
+        assert(!function.get_instructions().empty());
+    }
+    return isDisassembled;
 }
 
 TriState NamedFunction::is_linked_to_source_file() const
 {
-    if (!canLinkToSourceFile)
-        return TriState::NotApplicable;
-    if (function.get_source_file_name().empty())
-        return TriState::False;
-    else
-        return TriState::True;
+    if (isLinkedToSourceFile == TriState::True)
+    {
+        assert(!function.get_source_file_name().empty());
+    }
+    return isLinkedToSourceFile;
 }
 
 bool NamedFunctionMatchInfo::is_matched() const

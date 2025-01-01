@@ -144,16 +144,15 @@ struct NamedFunction
     using Id = uint32_t;
     static constexpr Id InvalidId = ~Id(0);
 
-    bool is_disassembled() const;
-    TriState is_linked_to_source_file() const;
+    bool is_disassembled() const; // Is async compatible.
+    TriState is_linked_to_source_file() const; // Is async compatible.
 
     std::string name;
     Function function;
 
     Id id = InvalidId;
-
-    // Is set false if function could not be linked to a source file.
-    bool canLinkToSourceFile = true;
+    bool isDisassembled = false;
+    TriState isLinkedToSourceFile = TriState::False;
 };
 using NamedFunctions = std::vector<NamedFunction>;
 using NamedFunctionPair = std::array<NamedFunction *, 2>;

@@ -641,10 +641,10 @@ NamedFunctionBundle Runner::build_bundle(
 
 void Runner::disassemble_function(NamedFunction &named, const FunctionSetup &setup)
 {
-    if (named.is_disassembled())
-        return;
+    assert(!named.isDisassembled);
 
     named.function.disassemble(setup);
+    named.isDisassembled = true;
 }
 
 void Runner::disassemble_matched_functions(
@@ -690,8 +690,7 @@ void Runner::disassemble_functions(span<NamedFunction> named_functions, const Ex
 
 void Runner::build_source_lines_for_function(NamedFunction &named, const PdbReader &pdb_reader)
 {
-    if (named.is_linked_to_source_file() != TriState::False)
-        return;
+    assert(named.isLinkedToSourceFile == TriState::False);
 
     const Address64T address = named.function.get_begin_address();
     const PdbFunctionInfo *pdb_function = pdb_reader.find_function_by_address(address);
@@ -701,10 +700,11 @@ void Runner::build_source_lines_for_function(NamedFunction &named, const PdbRead
         const PdbSourceFileInfoVector &source_files = pdb_reader.get_source_files();
         const PdbSourceFileInfo &source_file = source_files[pdb_function->sourceFileId];
         named.function.set_source_file(source_file, pdb_function->sourceLines);
+        named.isLinkedToSourceFile = TriState::True;
     }
     else
     {
-        named.canLinkToSourceFile = false;
+        named.isLinkedToSourceFile = TriState::NotApplicable;
     }
 }
 
@@ -728,7 +728,7 @@ void Runner::build_source_lines_for_matched_functions(
             for (const MatchedFunction &matched : matched_functions)
             {
                 NamedFunction &named = named_functions_pair[i]->at(matched.named_idx_pair[i]);
-                named.canLinkToSourceFile = false;
+                named.isLinkedToSourceFile = TriState::NotApplicable;
             }
         }
     }
@@ -755,13 +755,13 @@ void Runner::build_source_lines_for_functions(span<NamedFunction> named_function
 
 bool Runner::load_source_file_for_function(FileContentStorage &storage, const NamedFunction &named)
 {
-    if (!named.canLinkToSourceFile)
+    if (named.isLinkedToSourceFile == TriState::NotApplicable)
     {
         // Has no source file associated. Treat as success.
         return true;
     }
 
-    assert(named.is_linked_to_source_file() == TriState::True);
+    assert(named.isLinkedToSourceFile == TriState::True);
 
     FileContentStorage::LoadResult result = storage.load_content(named.function.get_source_file_name());
     return result != FileContentStorage::LoadResult::Failed;

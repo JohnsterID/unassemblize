@@ -25,17 +25,17 @@ namespace unassemblize::gui
 ImGuiApp::AssemblerTableColumnsDrawer::AssemblerTableColumnsDrawer(
     const NamedFunction &namedFunction,
     const TextFileContent *fileContent,
-    const AsmInstructions *instructions) :
-    m_namedFunction(namedFunction), m_fileContent(fileContent), m_instructionSource(instructions)
+    const AsmInstructions &instructions) :
+    m_namedFunction(namedFunction), m_fileContent(fileContent), m_instructionSource(&instructions)
 {
 }
 
 ImGuiApp::AssemblerTableColumnsDrawer::AssemblerTableColumnsDrawer(
     const NamedFunction &namedFunction,
     const TextFileContent *fileContent,
-    const AsmComparisonRecords *records,
+    const AsmComparisonRecords &records,
     Side side) :
-    m_namedFunction(namedFunction), m_fileContent(fileContent), m_instructionSource(records), m_side(side)
+    m_namedFunction(namedFunction), m_fileContent(fileContent), m_instructionSource(&records), m_side(side)
 {
 }
 
@@ -493,7 +493,7 @@ WorkQueueCommandPtr ImGuiApp::create_load_pdb_and_exe_command(ProgramFileRevisio
 {
     auto command = create_load_pdb_command(revisionDescriptor);
 
-    command->chain([revisionDescriptor](WorkQueueResultPtr &result) mutable -> WorkQueueCommandPtr {
+    command->chain_to_last([revisionDescriptor](WorkQueueResultPtr &result) mutable -> WorkQueueCommandPtr {
         if (revisionDescriptor->m_pdbReader == nullptr)
             return nullptr;
 
@@ -794,6 +794,14 @@ WorkQueueCommandPtr ImGuiApp::create_process_selected_functions_command(
         command->chain_to_last([=](WorkQueueResultPtr &result) mutable {
             return create_load_source_files_for_selected_functions_command(revisionDescriptor, namedFunctionIndices);
         });
+    }
+    else
+    {
+        for (IndexT namedFunctionIndex : namedFunctionIndices)
+        {
+            NamedFunction &namedFunction = revisionDescriptor->m_namedFunctions[namedFunctionIndex];
+            namedFunction.isLinkedToSourceFile = TriState::NotApplicable;
+        }
     }
 
     return command;
@@ -2691,13 +2699,16 @@ void ImGuiApp::ComparisonManagerBundlesList(ProgramComparisonDescriptor::File &f
         const int count = file.m_bundlesFilter.Filtered().size();
         const int oldSelectionSize = selection.Size;
         bool selectionChanged = false;
-        ImGuiMultiSelectIO *ms_io = ImGui::BeginMultiSelect(ImGuiMultiSelectFlags_BoxSelect1d, selection.Size, count);
+        ImGuiMultiSelectIO *multiSelectIO = ImGui::BeginMultiSelect(
+            ImGuiMultiSelectFlags_BoxSelect1d | ImGuiMultiSelectFlags_ClearOnEscape,
+            selection.Size,
+            count);
         selection.UserData = &file;
         selection.AdapterIndexToStorageId = [](ImGuiSelectionBasicStorage *self, int idx) -> ImGuiID {
             const auto file = static_cast<const File *>(self->UserData);
             return ImGuiID(file->get_filtered_bundle(idx).id);
         };
-        selection.ApplyRequests(ms_io);
+        selection.ApplyRequests(multiSelectIO);
 
         ImGuiListClipper clipper;
         clipper.Begin(count);
@@ -2724,8 +2735,8 @@ void ImGuiApp::ComparisonManagerBundlesList(ProgramComparisonDescriptor::File &f
             }
         }
 
-        ms_io = ImGui::EndMultiSelect();
-        selection.ApplyRequests(ms_io);
+        multiSelectIO = ImGui::EndMultiSelect();
+        selection.ApplyRequests(multiSelectIO);
 
         if (selectionChanged || oldSelectionSize != selection.Size)
         {
@@ -2834,13 +2845,16 @@ void ImGuiApp::ComparisonManagerFunctionsList(
         const int count = file.m_functionIndicesFilter.Filtered().size();
         const int oldSelectionSize = selection.Size;
         bool selectionChanged = false;
-        ImGuiMultiSelectIO *ms_io = ImGui::BeginMultiSelect(ImGuiMultiSelectFlags_BoxSelect1d, selection.Size, count);
+        ImGuiMultiSelectIO *multiSelectIO = ImGui::BeginMultiSelect(
+            ImGuiMultiSelectFlags_BoxSelect1d | ImGuiMultiSelectFlags_ClearOnEscape,
+            selection.Size,
+            count);
         selection.UserData = &file;
         selection.AdapterIndexToStorageId = [](ImGuiSelectionBasicStorage *self, int idx) -> ImGuiID {
             const auto file = static_cast<const File *>(self->UserData);
             return ImGuiID(file->get_filtered_named_function(idx).id);
         };
-        selection.ApplyRequests(ms_io);
+        selection.ApplyRequests(multiSelectIO);
 
         ImGuiListClipper clipper;
         clipper.Begin(count);
@@ -2867,8 +2881,8 @@ void ImGuiApp::ComparisonManagerFunctionsList(
             }
         }
 
-        ms_io = ImGui::EndMultiSelect();
-        selection.ApplyRequests(ms_io);
+        multiSelectIO = ImGui::EndMultiSelect();
+        selection.ApplyRequests(multiSelectIO);
 
         if (selectionChanged || oldSelectionSize != selection.Size)
         {
@@ -3069,9 +3083,9 @@ void ImGuiApp::ComparisonManagerMatchedFunctionContentTable(
     const ProgramFileRevisionDescriptor &revision = *descriptor.m_files[side].m_revisionDescriptor;
     const std::string &sourceFile = namedFunction.function.get_source_file_name();
     const TextFileContent *fileContent = revision.m_fileContentStorage.find_content(sourceFile);
-    const bool showSourceCodeColumns = fileContent != nullptr;
+    const bool showSourceCodeColumns = namedFunction.is_linked_to_source_file() == TriState::True;
     const std::vector<AssemblerTableColumn> &assemblerTableColumns = GetAssemblerTableColumns(side, showSourceCodeColumns);
-    AssemblerTableColumnsDrawer columnsDrawer(namedFunction, fileContent, &records, side);
+    AssemblerTableColumnsDrawer columnsDrawer(namedFunction, fileContent, records, side);
 
     const ImVec2 tableSize(0.0f, GetMaxTableHeight(records.size()));
     ImScoped::Table table("function_assembler_table", assemblerTableColumns.size(), AssemblerTableFlags, tableSize);
@@ -3139,6 +3153,8 @@ void ImGuiApp::ComparisonManagerNamedFunctions(
         const ProgramFileRevisionDescriptor &revision = *file.m_revisionDescriptor;
         const NamedFunction &namedFunction = revision.m_namedFunctions[namedFunctionIndex];
         if (!namedFunction.is_disassembled())
+            continue;
+        if (namedFunction.is_linked_to_source_file() == TriState::False)
             continue;
 
         const File::NamedFunctionUiInfo &uiInfo0 = file.m_namedFunctionUiInfos[namedFunctionIndex];
@@ -3208,9 +3224,9 @@ void ImGuiApp::ComparisonManagerNamedFunctionContentTable(
     const AsmInstructions &instructions = namedFunction.function.get_instructions();
     const std::string &sourceFile = namedFunction.function.get_source_file_name();
     const TextFileContent *fileContent = fileRevision.m_fileContentStorage.find_content(sourceFile);
-    const bool showSourceCodeColumns = fileContent != nullptr;
+    const bool showSourceCodeColumns = namedFunction.is_linked_to_source_file() == TriState::True;
     const std::vector<AssemblerTableColumn> &assemblerTableColumns = GetAssemblerTableColumns(side, showSourceCodeColumns);
-    AssemblerTableColumnsDrawer columnsDrawer(namedFunction, fileContent, &instructions);
+    AssemblerTableColumnsDrawer columnsDrawer(namedFunction, fileContent, instructions);
 
     ImScoped::Table table(
         "function_assembler_table",
