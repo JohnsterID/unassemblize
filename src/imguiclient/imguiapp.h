@@ -298,7 +298,8 @@ private:
     void ComparisonManagerFilesHeaders();
     void ComparisonManagerFilesLists(ProgramComparisonDescriptor &descriptor);
     void ComparisonManagerFilesList(ProgramComparisonDescriptor::File &file);
-    void ComparisonManagerFilesActions(ProgramComparisonDescriptor &descriptor);
+    void ComparisonManagerFilesActions1(ProgramComparisonDescriptor &descriptor);
+    void ComparisonManagerFilesActions2(ProgramComparisonDescriptor &descriptor);
     void ComparisonManagerFilesCompareButton(ProgramComparisonDescriptor &descriptor);
     void ComparisonManagerFilesProcessFunctionsCheckbox(ProgramComparisonDescriptor &descriptor);
     void ComparisonManagerFilesProgressOverlay(const ProgramComparisonDescriptor &descriptor, const ImRect &rect);

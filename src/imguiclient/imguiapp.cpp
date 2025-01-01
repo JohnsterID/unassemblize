@@ -895,9 +895,20 @@ void ImGuiApp::load_and_init_comparison_async(
     {
         ProgramComparisonDescriptor::File &file = comparisonDescriptor->m_files[i];
 
+        if (file.m_imguiReloadFileRevisionOnCompare)
+        {
+            // Discard the current file revision.
+            file.m_revisionDescriptor.reset();
+        }
+    }
+
+    for (int i = 0; i < 2; ++i)
+    {
+        ProgramComparisonDescriptor::File &file = comparisonDescriptor->m_files[i];
+
         if (file.m_revisionDescriptor == nullptr || file.m_revisionDescriptor != fileDescriptorPair[i]->m_revisionDescriptor)
         {
-            // Force rebuild matched functions when at least one of the files needs to be loaded first or has changed.
+            // Force rebuild matched functions when at least one of the files needs to be loaded or has changed.
             comparisonDescriptor->prepare_rebuild();
             break;
         }
@@ -905,41 +916,27 @@ void ImGuiApp::load_and_init_comparison_async(
 
     bool isAsyncLoading = false;
     const bool isComparingSameFile = fileDescriptorPair[0] == fileDescriptorPair[1];
-    const int loadFileCount = isComparingSameFile ? 1 : 2;
 
-    for (int i = 0; i < loadFileCount; ++i)
+    if (isComparingSameFile)
     {
-        ProgramFileDescriptor *fileDescriptor = fileDescriptorPair[i];
+        ProgramFileDescriptor *fileDescriptor = fileDescriptorPair[0];
+        const bool reload = comparisonDescriptor->m_files[0].m_imguiReloadFileRevisionOnCompare
+            || comparisonDescriptor->m_files[1].m_imguiReloadFileRevisionOnCompare;
 
-        if (fileDescriptor->exe_loaded())
+        if (!reload && fileDescriptor->exe_loaded())
         {
             // Executable is already loaded. Use it.
 
-            if (isComparingSameFile)
-            {
-                comparisonDescriptor->m_files[0].m_revisionDescriptor = fileDescriptor->m_revisionDescriptor;
-                comparisonDescriptor->m_files[1].m_revisionDescriptor = fileDescriptor->m_revisionDescriptor;
-            }
-            else
-            {
-                comparisonDescriptor->m_files[i].m_revisionDescriptor = fileDescriptor->m_revisionDescriptor;
-            }
+            comparisonDescriptor->m_files[0].m_revisionDescriptor = fileDescriptor->m_revisionDescriptor;
+            comparisonDescriptor->m_files[1].m_revisionDescriptor = fileDescriptor->m_revisionDescriptor;
         }
         else
         {
             // Executable is not yet loaded. Load it first.
 
             fileDescriptor->create_new_revision_descriptor();
-
-            if (isComparingSameFile)
-            {
-                comparisonDescriptor->m_files[0].m_revisionDescriptor = fileDescriptor->m_revisionDescriptor;
-                comparisonDescriptor->m_files[1].m_revisionDescriptor = fileDescriptor->m_revisionDescriptor;
-            }
-            else
-            {
-                comparisonDescriptor->m_files[i].m_revisionDescriptor = fileDescriptor->m_revisionDescriptor;
-            }
+            comparisonDescriptor->m_files[0].m_revisionDescriptor = fileDescriptor->m_revisionDescriptor;
+            comparisonDescriptor->m_files[1].m_revisionDescriptor = fileDescriptor->m_revisionDescriptor;
 
             auto command = create_load_command(fileDescriptor->m_revisionDescriptor);
 
@@ -953,6 +950,41 @@ void ImGuiApp::load_and_init_comparison_async(
 
             m_workQueue.enqueue(std::move(command));
             isAsyncLoading = true;
+        }
+    }
+    else
+    {
+        for (int i = 0; i < 2; ++i)
+        {
+            ProgramFileDescriptor *fileDescriptor = fileDescriptorPair[i];
+            const bool reload = comparisonDescriptor->m_files[i].m_imguiReloadFileRevisionOnCompare;
+
+            if (!reload && fileDescriptor->exe_loaded())
+            {
+                // Executable is already loaded. Use it.
+
+                comparisonDescriptor->m_files[i].m_revisionDescriptor = fileDescriptor->m_revisionDescriptor;
+            }
+            else
+            {
+                // Executable is not yet loaded. Load it first.
+
+                fileDescriptor->create_new_revision_descriptor();
+                comparisonDescriptor->m_files[i].m_revisionDescriptor = fileDescriptor->m_revisionDescriptor;
+
+                auto command = create_load_command(fileDescriptor->m_revisionDescriptor);
+
+                command->chain_to_last([this, comparisonDescriptor](WorkQueueResultPtr &result) -> WorkQueueCommandPtr {
+                    if (comparisonDescriptor->executables_loaded())
+                    {
+                        init_comparison_async(comparisonDescriptor);
+                    }
+                    return nullptr;
+                });
+
+                m_workQueue.enqueue(std::move(command));
+                isAsyncLoading = true;
+            }
         }
     }
 
@@ -1741,6 +1773,10 @@ void ImGuiApp::FileManagerDescriptorActions(ProgramFileDescriptor &descriptor, b
         {
             load_async(&descriptor);
         }
+        ImGui::SameLine();
+        TooltipTextUnformattedMarker(
+            "Loads or reloads a valid file. "
+            "Old file revisions will be lost when no longer referenced.");
     }
 
     ImGui::SameLine();
@@ -1757,6 +1793,8 @@ void ImGuiApp::FileManagerDescriptorActions(ProgramFileDescriptor &descriptor, b
         {
             save_config_async(&descriptor);
         }
+        ImGui::SameLine();
+        TooltipTextUnformattedMarker("Saves a json config file for this loaded file.");
     }
 }
 
@@ -1896,6 +1934,10 @@ void ImGuiApp::FileManagerGlobalButtons()
                 load_async(descriptor.get());
             }
         }
+        ImGui::SameLine();
+        TooltipTextUnformattedMarker(
+            "Loads or reloads all valid files. "
+            "Old file revisions will be lost when no longer referenced.");
     }
 }
 
@@ -2482,7 +2524,9 @@ void ImGuiApp::ComparisonManagerBody(ProgramComparisonDescriptor &descriptor)
             ImScoped::Disabled disabled(descriptor.has_async_work());
 
             ComparisonManagerFilesLists(descriptor);
-            ComparisonManagerFilesActions(descriptor);
+            MoveCursorScreenPos(0.0f, -5.0f); // Hack, removes gap.
+            ComparisonManagerFilesActions1(descriptor);
+            ComparisonManagerFilesActions2(descriptor);
         }
         const ImRect groupRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
         ComparisonManagerFilesProgressOverlay(descriptor, groupRect);
@@ -2544,7 +2588,6 @@ void ImGuiApp::ComparisonManagerFilesLists(ProgramComparisonDescriptor &descript
                 ImScoped::ID id(i);
 
                 ProgramComparisonDescriptor::File &file = descriptor.m_files[i];
-
                 ComparisonManagerFilesList(file);
             }
         }
@@ -2574,7 +2617,29 @@ void ImGuiApp::ComparisonManagerFilesList(ProgramComparisonDescriptor::File &fil
     }
 }
 
-void ImGuiApp::ComparisonManagerFilesActions(ProgramComparisonDescriptor &descriptor)
+void ImGuiApp::ComparisonManagerFilesActions1(ProgramComparisonDescriptor &descriptor)
+{
+    ImScoped::Table table("files_actions1_table", 2, ComparisonSplitTableFlags);
+    if (table.IsContentVisible)
+    {
+        ImGui::TableNextRow();
+
+        for (int i = 0; i < 2; ++i)
+        {
+            ImGui::TableSetColumnIndex(i);
+            ImScoped::ID id(i);
+
+            ProgramComparisonDescriptor::File &file = descriptor.m_files[i];
+            ImGui::Checkbox("Reload File Revision", &file.m_imguiReloadFileRevisionOnCompare);
+            ImGui::SameLine();
+            TooltipTextUnformattedMarker(
+                "When enabled, reloads this file on the next comparison. "
+                "Otherwise, a loaded file revision is kept.");
+        }
+    }
+}
+
+void ImGuiApp::ComparisonManagerFilesActions2(ProgramComparisonDescriptor &descriptor)
 {
     ComparisonManagerFilesCompareButton(descriptor);
     ImGui::SameLine();
@@ -3016,9 +3081,7 @@ void ImGuiApp::ComparisonManagerFunctionEntriesControls(ProgramComparisonDescrip
         ImGui::DragInt("Page Size", &descriptor.m_imguiPageSize, 0.5f, 1, 100, "%d", ImGuiSliderFlags_AlwaysClamp);
         ImGui::SameLine();
         TooltipTextUnformattedMarker(
-            "Click and drag to edit value.\n"
-            "Hold SHIFT/ALT for faster/slower edit.\n"
-            "Double-click or CTRL+click to input value.");
+            "Sets the number of functions to show in a page. Click and drag to edit value. CTRL+click to input value.");
     }
 
     {
@@ -3029,7 +3092,7 @@ void ImGuiApp::ComparisonManagerFunctionEntriesControls(ProgramComparisonDescrip
         ImGui::SameLine();
         ImGui::SliderInt("Page Select", &descriptor.m_imguiSelectedPage, 1, pageCount, "%d", ImGuiSliderFlags_AlwaysClamp);
         ImGui::SameLine();
-        TooltipTextUnformattedMarker("CTRL+click to input value.");
+        TooltipTextUnformattedMarker("Selects the page of the selected functions. CTRL+click to input value.");
     }
 }
 

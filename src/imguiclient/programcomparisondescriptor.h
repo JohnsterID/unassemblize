@@ -154,6 +154,9 @@ struct ProgramComparisonDescriptor
         // Selected bundle type in combo box.
         IndexT m_imguiSelectedBundleTypeIdx = 0;
 
+        // Files list options.
+        bool m_imguiReloadFileRevisionOnCompare = false;
+
         // Functions list options.
         bool m_imguiShowMatchedFunctions = true;
         bool m_imguiShowUnmatchedFunctions = true;
