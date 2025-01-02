@@ -83,6 +83,11 @@ bool ProgramFileDescriptor::can_save_config() const
     return can_save_exe_config() || can_save_pdb_config();
 }
 
+bool ProgramFileDescriptor::can_compare() const
+{
+    return (can_load() || exe_loaded()) && !has_async_work();
+}
+
 bool ProgramFileDescriptor::exe_loaded() const
 {
     return m_revisionDescriptor != nullptr && m_revisionDescriptor->exe_loaded();

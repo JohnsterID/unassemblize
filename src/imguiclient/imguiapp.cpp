@@ -1364,6 +1364,22 @@ void ImGuiApp::on_functions_interaction(ProgramComparisonDescriptor &descriptor,
     process_leftover_named_functions_async(file.m_revisionDescriptor, {file.m_selectedUnmatchedNamedFunctionIndices});
 }
 
+void ImGuiApp::on_process_matched_functions_interaction(ProgramComparisonDescriptor &descriptor)
+{
+    if (descriptor.m_imguiProcessMatchedFunctionsImmediately && descriptor.bundles_ready())
+    {
+        process_all_leftover_named_and_matched_functions_async(descriptor);
+    }
+}
+
+void ImGuiApp::on_process_unmatched_functions_interaction(ProgramComparisonDescriptor &descriptor)
+{
+    if (descriptor.m_imguiProcessUnmatchedFunctionsImmediately && descriptor.bundles_ready())
+    {
+        process_all_leftover_named_functions_async(descriptor);
+    }
+}
+
 std::string ImGuiApp::create_section_string(uint32_t section_index, const ExeSections *sections)
 {
     if (sections != nullptr && section_index < sections->size())
@@ -1534,6 +1550,7 @@ void ImGuiApp::FileManagerMenu()
         if (ImGui::BeginMenu("View"))
         {
             ImGui::MenuItem("Show Tabs", nullptr, &m_showFileManagerWithTabs);
+            ImGui::Separator();
             ImGui::MenuItem("Show Exe Section Info", nullptr, &m_showFileManagerExeSectionInfo);
             ImGui::MenuItem("Show Exe Symbol Info", nullptr, &m_showFileManagerExeSymbolInfo);
             ImGui::MenuItem("Show Pdb Compiland Info", nullptr, &m_showFileManagerPdbCompilandInfo);
@@ -2479,6 +2496,54 @@ void ImGuiApp::ComparisonManagerMenu(ProgramComparisonDescriptor &descriptor)
     {
         if (ImGui::BeginMenu("File"))
         {
+            const bool hasWork = descriptor.has_async_work();
+
+            {
+                const IndexT selectedFileIdx0 = descriptor.m_files[0].m_imguiSelectedFileIdx;
+                const IndexT selectedFileIdx1 = descriptor.m_files[1].m_imguiSelectedFileIdx;
+                ProgramFileDescriptor *fileDescriptor0 = get_program_file_descriptor(selectedFileIdx0);
+                ProgramFileDescriptor *fileDescriptor1 = get_program_file_descriptor(selectedFileIdx1);
+                const bool canCompare0 = fileDescriptor0 != nullptr && fileDescriptor0->can_compare();
+                const bool canCompare1 = fileDescriptor1 != nullptr && fileDescriptor1->can_compare();
+
+                ImScoped::Disabled disabled(hasWork || !canCompare0 || !canCompare1);
+
+                if (ImGui::MenuItem("Compare"))
+                {
+                    load_and_init_comparison_async({fileDescriptor0, fileDescriptor1}, &descriptor);
+                }
+            }
+
+            ImGui::Separator();
+
+            {
+                bool *processMatchedFunctions = &descriptor.m_imguiProcessMatchedFunctionsImmediately;
+                bool *processUnmatchedFunctions = &descriptor.m_imguiProcessUnmatchedFunctionsImmediately;
+
+                ImScoped::Disabled disabled(hasWork);
+
+                if (ImGui::MenuItem("Process Matched Functions", nullptr, processMatchedFunctions))
+                {
+                    on_process_matched_functions_interaction(descriptor);
+                }
+                if (ImGui::MenuItem("Process Unmatched Functions", nullptr, processUnmatchedFunctions))
+                {
+                    on_process_unmatched_functions_interaction(descriptor);
+                }
+            }
+
+            ImGui::Separator();
+
+            {
+                bool *reloadFileRevision0 = &descriptor.m_files[0].m_imguiReloadFileRevisionOnCompare;
+                bool *reloadFileRevision1 = &descriptor.m_files[1].m_imguiReloadFileRevisionOnCompare;
+
+                ImScoped::Disabled disabled(hasWork);
+
+                ImGui::MenuItem("Reload File Revision - Left", nullptr, reloadFileRevision0);
+                ImGui::MenuItem("Reload File Revision - Right", nullptr, reloadFileRevision1);
+            }
+
             ImGui::EndMenu();
         }
 
@@ -2504,6 +2569,8 @@ void ImGuiApp::ComparisonManagerMenu(ProgramComparisonDescriptor &descriptor)
                 ImGui::EndMenu();
             }
 
+            ImGui::Separator();
+
             ImGui::MenuItem("Open Settings", nullptr, &descriptor.m_imguiSettingsWindowOpened);
 
             ImGui::EndMenu();
@@ -2517,12 +2584,11 @@ void ImGuiApp::ComparisonManagerBody(ProgramComparisonDescriptor &descriptor)
     if (TreeNodeHeader("Files", ImGuiTreeNodeFlags_DefaultOpen))
     {
         {
-            ComparisonManagerFilesHeaders();
-            MoveCursorScreenPos(0.0f, -5.0f); // Hack, removes gap.
-
             ImScoped::Group group;
             ImScoped::Disabled disabled(descriptor.has_async_work());
 
+            ComparisonManagerFilesHeaders();
+            MoveCursorScreenPos(0.0f, -5.0f); // Hack, removes gap.
             ComparisonManagerFilesLists(descriptor);
             MoveCursorScreenPos(0.0f, -5.0f); // Hack, removes gap.
             ComparisonManagerFilesActions1(descriptor);
@@ -2652,11 +2718,8 @@ void ImGuiApp::ComparisonManagerFilesCompareButton(ProgramComparisonDescriptor &
     const IndexT selectedFileIdx1 = descriptor.m_files[1].m_imguiSelectedFileIdx;
     ProgramFileDescriptor *fileDescriptor0 = get_program_file_descriptor(selectedFileIdx0);
     ProgramFileDescriptor *fileDescriptor1 = get_program_file_descriptor(selectedFileIdx1);
-
-    const bool canCompare0 = fileDescriptor0 && (fileDescriptor0->can_load() || fileDescriptor0->exe_loaded())
-        && !fileDescriptor0->has_async_work();
-    const bool canCompare1 = fileDescriptor1 && (fileDescriptor1->can_load() || fileDescriptor1->exe_loaded())
-        && !fileDescriptor1->has_async_work();
+    const bool canCompare0 = fileDescriptor0 != nullptr && fileDescriptor0->can_compare();
+    const bool canCompare1 = fileDescriptor1 != nullptr && fileDescriptor1->can_compare();
 
     ImScoped::Disabled disabled(!canCompare0 || !canCompare1);
     // Change button color.
@@ -2678,10 +2741,7 @@ void ImGuiApp::ComparisonManagerFilesProcessFunctionsCheckbox(ProgramComparisonD
 {
     if (ImGui::Checkbox("Process Matched Functions", &descriptor.m_imguiProcessMatchedFunctionsImmediately))
     {
-        if (descriptor.m_imguiProcessMatchedFunctionsImmediately && descriptor.bundles_ready())
-        {
-            process_all_leftover_named_and_matched_functions_async(descriptor);
-        }
+        on_process_matched_functions_interaction(descriptor);
     }
     ImGui::SameLine();
     TooltipTextUnformattedMarker(
@@ -2691,10 +2751,7 @@ void ImGuiApp::ComparisonManagerFilesProcessFunctionsCheckbox(ProgramComparisonD
     ImGui::SameLine();
     if (ImGui::Checkbox("Process Unmatched Functions", &descriptor.m_imguiProcessUnmatchedFunctionsImmediately))
     {
-        if (descriptor.m_imguiProcessUnmatchedFunctionsImmediately && descriptor.bundles_ready())
-        {
-            process_all_leftover_named_functions_async(descriptor);
-        }
+        on_process_unmatched_functions_interaction(descriptor);
     }
     ImGui::SameLine();
     TooltipTextUnformattedMarker(

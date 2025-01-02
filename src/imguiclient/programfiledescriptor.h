@@ -39,6 +39,7 @@ struct ProgramFileDescriptor
     bool can_save_exe_config() const;
     bool can_save_pdb_config() const;
     bool can_save_config() const;
+    bool can_compare() const;
 
     bool exe_loaded() const;
     bool pdb_loaded() const;

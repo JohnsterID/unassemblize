@@ -250,6 +250,8 @@ private:
     void update_bundles_interaction(ProgramComparisonDescriptor::File &file);
     void update_functions_interaction(ProgramComparisonDescriptor &descriptor, ProgramComparisonDescriptor::File &file);
     void on_functions_interaction(ProgramComparisonDescriptor &descriptor, ProgramComparisonDescriptor::File &file);
+    void on_process_matched_functions_interaction(ProgramComparisonDescriptor &descriptor);
+    void on_process_unmatched_functions_interaction(ProgramComparisonDescriptor &descriptor);
 
     static std::string create_section_string(uint32_t section_index, const ExeSections *sections);
     static std::string create_time_string(std::chrono::time_point<std::chrono::system_clock> time_point);
