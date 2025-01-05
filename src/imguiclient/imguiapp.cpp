@@ -483,7 +483,7 @@ WorkQueueCommandPtr ImGuiApp::create_load_pdb_and_exe_command(ProgramFileRevisio
 {
     auto command = create_load_pdb_command(revisionDescriptor);
 
-    command->chain_to_last([revisionDescriptor](WorkQueueResultPtr &result) mutable -> WorkQueueCommandPtr {
+    command->chain_to_last([revisionDescriptor]() mutable -> WorkQueueCommandPtr {
         if (revisionDescriptor->m_pdbReader == nullptr)
             return nullptr;
 
@@ -777,11 +777,11 @@ WorkQueueCommandPtr ImGuiApp::create_process_selected_functions_command(
 
     if (revisionDescriptor->pdb_loaded())
     {
-        command->chain_to_last([=](WorkQueueResultPtr &result) mutable {
+        command->chain_to_last([=]() mutable -> WorkQueueCommandPtr {
             return create_build_source_lines_for_selected_functions_command(revisionDescriptor, namedFunctionIndices);
         });
 
-        command->chain_to_last([=](WorkQueueResultPtr &result) mutable {
+        command->chain_to_last([=]() mutable -> WorkQueueCommandPtr {
             return create_load_source_files_for_selected_functions_command(revisionDescriptor, namedFunctionIndices);
         });
     }
@@ -863,16 +863,18 @@ void ImGuiApp::save_config_async(ProgramFileDescriptor *descriptor)
     {
         descriptor->m_revisionDescriptor->m_exeConfigFilenameCopy = descriptor->m_exeConfigFilename;
         next_command = next_command->chain(
-            [descriptor, revisionDescriptor = descriptor->m_revisionDescriptor](WorkQueueResultPtr &result) mutable
-            -> WorkQueueCommandPtr { return create_save_exe_config_command(revisionDescriptor); });
+            [descriptor, revisionDescriptor = descriptor->m_revisionDescriptor]() mutable -> WorkQueueCommandPtr {
+                return create_save_exe_config_command(revisionDescriptor);
+            });
     }
 
     if (descriptor->can_save_pdb_config())
     {
         descriptor->m_revisionDescriptor->m_pdbConfigFilenameCopy = descriptor->m_pdbConfigFilename;
         next_command = next_command->chain(
-            [descriptor, revisionDescriptor = descriptor->m_revisionDescriptor](WorkQueueResultPtr &result) mutable
-            -> WorkQueueCommandPtr { return create_save_pdb_config_command(revisionDescriptor); });
+            [descriptor, revisionDescriptor = descriptor->m_revisionDescriptor]() mutable -> WorkQueueCommandPtr {
+                return create_save_pdb_config_command(revisionDescriptor);
+            });
     }
 
     assert(head_command.next_delayed_command != nullptr);
@@ -940,7 +942,7 @@ void ImGuiApp::load_and_init_comparison_async(
 
             auto command = create_load_command(fileDescriptor->m_revisionDescriptor);
 
-            command->chain_to_last([this, comparisonDescriptor](WorkQueueResultPtr &result) -> WorkQueueCommandPtr {
+            command->chain_to_last([this, comparisonDescriptor]() -> WorkQueueCommandPtr {
                 if (comparisonDescriptor->executables_loaded())
                 {
                     init_comparison_async(comparisonDescriptor);
@@ -974,7 +976,7 @@ void ImGuiApp::load_and_init_comparison_async(
 
                 auto command = create_load_command(fileDescriptor->m_revisionDescriptor);
 
-                command->chain_to_last([this, comparisonDescriptor](WorkQueueResultPtr &result) -> WorkQueueCommandPtr {
+                command->chain_to_last([this, comparisonDescriptor]() -> WorkQueueCommandPtr {
                     if (comparisonDescriptor->executables_loaded())
                     {
                         init_comparison_async(comparisonDescriptor);
@@ -1063,7 +1065,7 @@ void ImGuiApp::build_named_functions_async(ProgramComparisonDescriptor *comparis
         {
             auto command = create_build_named_functions_command(revisionDescriptorPair[i]);
 
-            command->chain_to_last([this, comparisonDescriptor](WorkQueueResultPtr &result) -> WorkQueueCommandPtr {
+            command->chain_to_last([this, comparisonDescriptor]() -> WorkQueueCommandPtr {
                 if (comparisonDescriptor->named_functions_built())
                 {
                     // Go to next step.
@@ -1081,7 +1083,7 @@ void ImGuiApp::build_matched_functions_async(ProgramComparisonDescriptor *compar
 {
     auto command = create_build_matched_functions_command(comparisonDescriptor);
 
-    command->chain_to_last([this, comparisonDescriptor](WorkQueueResultPtr &result) -> WorkQueueCommandPtr {
+    command->chain_to_last([this, comparisonDescriptor]() -> WorkQueueCommandPtr {
         assert(comparisonDescriptor->matched_functions_built());
 
         // Go to next step.
@@ -1100,7 +1102,7 @@ void ImGuiApp::build_bundled_functions_async(ProgramComparisonDescriptor *compar
         ProgramComparisonDescriptor::File &file = comparisonDescriptor->m_files[i];
         assert(file.m_revisionDescriptor != nullptr);
 
-        auto Callback = [this, comparisonDescriptor](WorkQueueResultPtr &result) -> WorkQueueCommandPtr {
+        auto Callback = [this, comparisonDescriptor]() -> WorkQueueCommandPtr {
             if (comparisonDescriptor->bundles_ready())
             {
                 // Go to next step.
@@ -1205,8 +1207,7 @@ void ImGuiApp::process_named_and_matched_functions_async(
                 auto command = create_process_selected_functions_command(revisionDescriptor, namedFunctionIndicesArray[i]);
 
                 command->chain_to_last(
-                    [this, sharedWorkCount, comparisonDescriptor, matchedFunctionIndices](
-                        WorkQueueResultPtr &result) -> WorkQueueCommandPtr {
+                    [this, sharedWorkCount, comparisonDescriptor, matchedFunctionIndices]() -> WorkQueueCommandPtr {
                         if (--(*sharedWorkCount) == 0)
                         {
                             --comparisonDescriptor->m_pendingBuildComparisonRecordsCommands;

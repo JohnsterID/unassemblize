@@ -40,7 +40,7 @@ using WorkQueueResultPtr = std::unique_ptr<WorkQueueResult>;
 using WorkQueueCommandId = uint32_t;
 inline constexpr WorkQueueCommandId InvalidWorkQueueCommandId = 0;
 
-using WorkQueueCommandCreateFunction = std::function<WorkQueueCommandPtr(WorkQueueResultPtr &result)>;
+using WorkQueueCommandCreateFunction = std::function<WorkQueueCommandPtr()>;
 using WorkQueueCommandWorkFunction = std::function<WorkQueueResultPtr(void)>;
 using WorkQueueCommandCallbackFunction = std::function<void(WorkQueueResultPtr &result)>;
 
@@ -55,8 +55,6 @@ struct WorkQueueDelayedCommand
 
     // Optional function to create and chain 1 new command.
     // The function is invoked after the previous command has completed its work and has returned its result.
-    // Note 1: The delayed command is result->command->next_delayed_command at the time of invocation.
-    // Note 2: The result is null if the delayed command is the head of the command chain.
     WorkQueueDelayedCommand *chain(WorkQueueCommandCreateFunction &&create_function)
     {
         // It would be possible to chain multiple, but currently we just chain one maximum.
@@ -97,10 +95,6 @@ struct WorkQueueCommand : public WorkQueueDelayedCommand
     // The result will not be pushed to the polling queue.
     WorkQueueCommandCallbackFunction callback;
 
-    // Optional context. Can point to address or store an id.
-    // Necessary to identify when polling.
-    void *context = nullptr;
-
     const WorkQueueCommandId command_id;
 
 private:
@@ -127,7 +121,7 @@ class WorkQueue
 
 public:
     explicit WorkQueue(BS::thread_pool *threadPool = nullptr) :
-        m_threadPool(threadPool), m_commandQueue(31), m_pollingQueue(31), m_callbackQueue(31){};
+        m_threadPool(threadPool), m_commandQueue(31), m_callbackQueue(31){};
     ~WorkQueue();
 
     void start();
@@ -141,14 +135,11 @@ public:
     bool enqueue(WorkQueueCommandPtr &&command);
     bool enqueue(WorkQueueDelayedCommand &delayed_command);
 
-    // Polls one result at a time manually. Returns nothing if commands have callbacks.
-    bool try_dequeue(WorkQueueResultPtr &result);
-
     // Updates callbacks and delayed commands.
     void update_callbacks();
 
 private:
-    bool enqueue(WorkQueueDelayedCommandPtr &&delayed_command, WorkQueueResultPtr &result);
+    bool enqueue(WorkQueueDelayedCommandPtr &&delayed_command);
 
     static void ThreadFunction(WorkQueue *self);
     void ThreadRun();
@@ -160,10 +151,8 @@ private:
     std::thread m_thread; // Used to dequeue commands.
 
     BlockingReaderWriterQueue<WorkQueueCommandPtr, 32> m_commandQueue;
-    ReaderWriterQueue<WorkQueueResultPtr, 32> m_pollingQueue;
     ReaderWriterQueue<WorkQueueResultPtr, 32> m_callbackQueue;
     std::atomic<int> m_callbackQueueSize = 0;
-    std::mutex m_pollingMutex;
     std::mutex m_callbackMutex;
 
     std::atomic<bool> m_busy = false;

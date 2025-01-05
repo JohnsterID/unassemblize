@@ -80,15 +80,14 @@ bool WorkQueue::enqueue(WorkQueueDelayedCommand &delayed_command)
     if (delayed_command.next_delayed_command == nullptr)
         return false;
 
-    WorkQueueResultPtr result;
-    return enqueue(std::move(delayed_command.next_delayed_command), result);
+    return enqueue(std::move(delayed_command.next_delayed_command));
 }
 
-bool WorkQueue::enqueue(WorkQueueDelayedCommandPtr &&delayed_command, WorkQueueResultPtr &result)
+bool WorkQueue::enqueue(WorkQueueDelayedCommandPtr &&delayed_command)
 {
     while (delayed_command != nullptr)
     {
-        WorkQueueCommandPtr chained_command = delayed_command->create(result);
+        WorkQueueCommandPtr chained_command = delayed_command->create();
 
         if (chained_command == nullptr)
         {
@@ -105,11 +104,6 @@ bool WorkQueue::enqueue(WorkQueueDelayedCommandPtr &&delayed_command, WorkQueueR
         return enqueue(std::move(chained_command));
     }
     return false;
-}
-
-bool WorkQueue::try_dequeue(WorkQueueResultPtr &result)
-{
-    return m_pollingQueue.try_dequeue(result);
 }
 
 void WorkQueue::update_callbacks()
@@ -141,7 +135,7 @@ void WorkQueue::update_callbacks()
 
             if (command != nullptr && command->has_delayed_command())
             {
-                enqueue(std::move(command->next_delayed_command), result);
+                enqueue(std::move(command->next_delayed_command));
             }
         }
 
@@ -235,14 +229,6 @@ void WorkQueue::DoWork(WorkQueueCommandPtr &&command, bool pooled)
             if (pooled)
                 lock.lock();
             m_callbackQueue.enqueue(std::move(result));
-        }
-        else
-        {
-            // Take lock if thread pool will enqueue here.
-            std::unique_lock lock(m_pollingMutex, std::defer_lock);
-            if (pooled)
-                lock.lock();
-            m_pollingQueue.enqueue(std::move(result));
         }
     }
 }
