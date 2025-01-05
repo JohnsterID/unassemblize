@@ -29,7 +29,6 @@
 
 namespace unassemblize::gui
 {
-
 static void glfw_error_callback(int error, const char *description)
 {
     fprintf(stderr, "GLFW Error %d: %s\n", error, description);
@@ -311,7 +310,7 @@ void ImGuiGLFW::updateDisplayScale()
     }
 }
 
-ImGuiStatus ImGuiGLFW::run(const CommandLineOptions &clo)
+ImGuiStatus ImGuiGLFW::run(const CommandLineOptions &clo, BS::thread_pool *threadPool)
 {
     if (!init())
     {
@@ -320,7 +319,7 @@ ImGuiStatus ImGuiGLFW::run(const CommandLineOptions &clo)
     }
 
     // Initialize the app after ImGui is fully set up
-    m_app = std::make_unique<ImGuiApp>();
+    m_app = std::make_unique<ImGuiApp>(threadPool);
 
     if (m_app->init(clo) != ImGuiStatus::Ok)
     {

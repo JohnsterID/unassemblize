@@ -18,7 +18,13 @@
 #include "runner.h"
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <thread>
+
+namespace BS
+{
+class thread_pool;
+}
 
 namespace unassemblize
 {
@@ -108,6 +114,7 @@ struct WorkQueueResult
     WorkQueueCommandPtr command;
 };
 
+// All public functions are meant to be called from a single thread only.
 class WorkQueue
 {
     friend class WorkQueueCommandQuit;
@@ -119,22 +126,25 @@ class WorkQueue
     using BlockingReaderWriterQueue = moodycamel::BlockingReaderWriterQueue<T, MAX_BLOCK_SIZE>;
 
 public:
-    WorkQueue() : m_commandQueue(31), m_pollingQueue(31), m_callbackQueue(31){};
+    explicit WorkQueue(BS::thread_pool *threadPool = nullptr) :
+        m_threadPool(threadPool), m_commandQueue(31), m_pollingQueue(31), m_callbackQueue(31){};
     ~WorkQueue();
 
     void start();
+
+    // Must keep calling update_callbacks if wait=false until is_busy returns false.
     void stop(bool wait);
 
+    // Returns true as long as the work queue thread is running and waiting or working on commands.
     bool is_busy() const;
-    bool is_quitting() const { return m_quit; }
-
-    WorkQueueCommandId get_last_finished_command_id() const { return m_lastFinishedCommandId.load(); }
 
     bool enqueue(WorkQueueCommandPtr &&command);
     bool enqueue(WorkQueueDelayedCommand &delayed_command);
 
+    // Polls one result at a time manually. Returns nothing if commands have callbacks.
     bool try_dequeue(WorkQueueResultPtr &result);
 
+    // Updates callbacks and delayed commands.
     void update_callbacks();
 
 private:
@@ -142,31 +152,22 @@ private:
 
     static void ThreadFunction(WorkQueue *self);
     void ThreadRun();
+    void DoWork(WorkQueueCommandPtr &&command, bool pooled);
+    bool HasPendingTasks() const;
+
+private:
+    BS::thread_pool *m_threadPool = nullptr; // Used to work on commands.
+    std::thread m_thread; // Used to dequeue commands.
 
     BlockingReaderWriterQueue<WorkQueueCommandPtr, 32> m_commandQueue;
     ReaderWriterQueue<WorkQueueResultPtr, 32> m_pollingQueue;
     ReaderWriterQueue<WorkQueueResultPtr, 32> m_callbackQueue;
+    std::atomic<int> m_callbackQueueSize = 0;
+    std::mutex m_pollingMutex;
+    std::mutex m_callbackMutex;
 
-    std::thread m_thread;
-
-    std::atomic<WorkQueueCommandId> m_lastFinishedCommandId = InvalidWorkQueueCommandId;
-
-    volatile bool m_quit = false;
-};
-
-struct WorkQueueCommandQuit : public WorkQueueCommand
-{
-    WorkQueueCommandQuit(WorkQueue &owner_queue) : m_ownerQueue(owner_queue)
-    {
-        WorkQueueCommand::work = [this]() {
-            m_ownerQueue.m_quit = true;
-            return WorkQueueResultPtr();
-        };
-    }
-
-    virtual ~WorkQueueCommandQuit() override = default;
-
-    WorkQueue &m_ownerQueue;
+    std::atomic<bool> m_busy = false;
+    std::atomic<bool> m_quit = false;
 };
 
 } // namespace unassemblize

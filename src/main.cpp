@@ -21,6 +21,9 @@
 #include <iostream>
 #include <stdio.h>
 
+#define BS_THREAD_POOL_DISABLE_EXCEPTION_HANDLING
+#include <BS_thread_pool.hpp>
+
 #ifdef _WIN32
 #include "imguiclient/imguiwin32.h"
 #include <Windows.h>
@@ -76,6 +79,8 @@ void CreateConsole()
 static CommandLineOptions g_options;
 static std::string g_parseError;
 static std::string g_helpString;
+static std::unique_ptr<BS::thread_pool> g_runnerThreadPool;
+static std::unique_ptr<BS::thread_pool> g_workQueueThreadPool;
 
 void parse_options(int argc, char **argv)
 {
@@ -264,6 +269,47 @@ void parse_options(int argc, char **argv)
     }
 }
 
+// Overwrite thread counts for testing.
+//#define WORKQUEUE_THREADPOOL_COUNT 0
+//#define RUNNER_THREADPOOL_COUNT 0
+
+void initialize_threadpools(bool gui)
+{
+    const BS::concurrency_t threadCount = std::max<BS::concurrency_t>(std::thread::hardware_concurrency(), 1);
+    BS::concurrency_t workQueueThreadCount;
+    BS::concurrency_t runnerThreadCount;
+    if (gui)
+    {
+        workQueueThreadCount = std::max<BS::concurrency_t>(threadCount / 4, 1);
+        // -2 for main thread and work queue thread.
+        runnerThreadCount = std::max<BS::concurrency_t>(threadCount - workQueueThreadCount - 2, 1);
+    }
+    else
+    {
+        workQueueThreadCount = 0;
+        // -1 for main thread.
+        runnerThreadCount = std::max<BS::concurrency_t>(threadCount - 1, 1);
+    }
+
+#if defined(WORKQUEUE_THREADPOOL_COUNT)
+    workQueueThreadCount = WORKQUEUE_THREADPOOL_COUNT;
+#endif
+#if defined(RUNNER_THREADPOOL_COUNT)
+    runnerThreadCount = RUNNER_THREADPOOL_COUNT;
+#endif
+
+    if (workQueueThreadCount > 0)
+    {
+        g_workQueueThreadPool = std::make_unique<BS::thread_pool>(workQueueThreadCount);
+    }
+
+    if (runnerThreadCount > 0)
+    {
+        g_runnerThreadPool = std::make_unique<BS::thread_pool>(runnerThreadCount);
+        unassemblize::Runner::set_thread_pool(g_runnerThreadPool.get());
+    }
+}
+
 std::unique_ptr<unassemblize::Executable> load_and_process_exe(
     std::string_view input_file,
     std::string_view config_file,
@@ -331,6 +377,8 @@ int main(int argc, char **argv)
 {
     parse_options(argc, argv);
 
+    initialize_threadpools(g_options.gui);
+
     bool gui_error = false;
 
     if (g_options.gui)
@@ -345,7 +393,7 @@ int main(int argc, char **argv)
         // Unsupported platform
         gui_error = true;
 #endif
-        unassemblize::gui::ImGuiStatus status = gui.run(g_options);
+        unassemblize::gui::ImGuiStatus status = gui.run(g_options, g_workQueueThreadPool.get());
         return int(status);
     }
     else

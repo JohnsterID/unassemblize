@@ -21,6 +21,9 @@
 #include <fmt/core.h>
 #include <fstream>
 
+#define BS_THREAD_POOL_DISABLE_EXCEPTION_HANDLING
+#include <BS_thread_pool.hpp>
+
 namespace unassemblize
 {
 namespace
@@ -48,6 +51,14 @@ inline ConstNamedFunctionPair to_const_named_function_pair(
         &named_functions_pair[1]->at(matched.named_idx_pair[1])};
 }
 } // namespace
+
+BS::thread_pool *Runner::s_threadPool = nullptr;
+
+void Runner::set_thread_pool(BS::thread_pool *threadPool)
+{
+    assert(s_threadPool == nullptr);
+    s_threadPool = threadPool;
+}
 
 std::unique_ptr<Executable> Runner::load_exe(const LoadExeOptions &o)
 {
@@ -561,6 +572,8 @@ NamedFunctionBundles Runner::build_bundles(
     NamedFunctionBundles bundles;
     bundles.resize(sources_count);
 
+    // This is cheap and not worth to parallelize.
+
     for (IndexT source_idx = 0; source_idx < sources_count; ++source_idx)
     {
         bundles[source_idx] =
@@ -647,6 +660,16 @@ void Runner::disassemble_function(NamedFunction &named, const FunctionSetup &set
     named.isDisassembled = true;
 }
 
+void Runner::disassemble_matched_function(
+    NamedFunctionsPair named_functions_pair,
+    const MatchedFunction &matched,
+    std::array<const FunctionSetup *, 2> setup_pair)
+{
+    NamedFunctionPair named_pair = to_named_function_pair(named_functions_pair, matched);
+    disassemble_function(*named_pair[0], *setup_pair[0]);
+    disassemble_function(*named_pair[1], *setup_pair[1]);
+}
+
 void Runner::disassemble_matched_functions(
     NamedFunctionsPair named_functions_pair,
     const MatchedFunctions &matched_functions,
@@ -656,11 +679,20 @@ void Runner::disassemble_matched_functions(
     const FunctionSetup setup0(*executable_pair[0], format);
     const FunctionSetup setup1(*executable_pair[1], format);
 
-    for (const MatchedFunction &matched : matched_functions)
+    if (s_threadPool != nullptr)
     {
-        NamedFunctionPair named_pair = to_named_function_pair(named_functions_pair, matched);
-        disassemble_function(*named_pair[0], setup0);
-        disassemble_function(*named_pair[1], setup1);
+        const BS::multi_future<void> loop_future =
+            s_threadPool->submit_loop(size_t(0), matched_functions.size(), [&](const size_t i) {
+                disassemble_matched_function(named_functions_pair, matched_functions[i], {&setup0, &setup1});
+            });
+        loop_future.wait();
+    }
+    else
+    {
+        for (const MatchedFunction &matched : matched_functions)
+        {
+            disassemble_matched_function(named_functions_pair, matched, {&setup0, &setup1});
+        }
     }
 }
 
@@ -672,9 +704,20 @@ void Runner::disassemble_selected_functions(
 {
     const FunctionSetup setup(executable, format);
 
-    for (IndexT index : named_function_indices)
+    if (s_threadPool != nullptr)
     {
-        disassemble_function(named_functions[index], setup);
+        const BS::multi_future<void> loop_future =
+            s_threadPool->submit_loop(size_t(0), named_function_indices.size(), [&](const size_t i) {
+                disassemble_function(named_functions[named_function_indices[i]], setup);
+            });
+        loop_future.wait();
+    }
+    else
+    {
+        for (IndexT index : named_function_indices)
+        {
+            disassemble_function(named_functions[index], setup);
+        }
     }
 }
 
@@ -682,9 +725,21 @@ void Runner::disassemble_functions(span<NamedFunction> named_functions, const Ex
 {
     const FunctionSetup setup(executable, format);
 
-    for (NamedFunction &named : named_functions)
+    if (s_threadPool != nullptr)
     {
-        disassemble_function(named, setup);
+        const BS::multi_future<void> loop_future =
+            s_threadPool->submit_loop(size_t(0), named_functions.size(), [&](const size_t i) {
+                disassemble_function(named_functions[i], setup);
+            });
+
+        loop_future.wait();
+    }
+    else
+    {
+        for (NamedFunction &named : named_functions)
+        {
+            disassemble_function(named, setup);
+        }
     }
 }
 
@@ -713,6 +768,8 @@ void Runner::build_source_lines_for_matched_functions(
     const MatchedFunctions &matched_functions,
     ConstPdbReaderPair pdb_reader_pair)
 {
+    // This is cheap and not worth to parallelize.
+
     for (size_t i = 0; i < 2; ++i)
     {
         if (const PdbReader *pdb_reader = pdb_reader_pair[i])
@@ -739,6 +796,8 @@ void Runner::build_source_lines_for_selected_functions(
     span<const IndexT> named_function_indices,
     const PdbReader &pdb_reader)
 {
+    // This is cheap and not worth to parallelize.
+
     for (IndexT index : named_function_indices)
     {
         build_source_lines_for_function(named_functions[index], pdb_reader);
@@ -747,6 +806,8 @@ void Runner::build_source_lines_for_selected_functions(
 
 void Runner::build_source_lines_for_functions(span<NamedFunction> named_functions, const PdbReader &pdb_reader)
 {
+    // This is cheap and not worth to parallelize.
+
     for (NamedFunction &named : named_functions)
     {
         build_source_lines_for_function(named, pdb_reader);
@@ -767,18 +828,43 @@ bool Runner::load_source_file_for_function(FileContentStorage &storage, const Na
     return result != FileContentStorage::LoadResult::Failed;
 }
 
+bool Runner::load_source_files_for_matched_function(
+    FileContentStorage &storage,
+    ConstNamedFunctionsPair named_functions_pair,
+    const MatchedFunction &matched)
+{
+    bool success = true;
+    for (size_t k = 0; k < 2; ++k)
+    {
+        const NamedFunction &named = named_functions_pair[k]->at(matched.named_idx_pair[k]);
+        success &= load_source_file_for_function(storage, named);
+    }
+    return success;
+}
+
 bool Runner::load_source_files_for_matched_functions(
     FileContentStorage &storage,
     ConstNamedFunctionsPair named_functions_pair,
     const MatchedFunctions &matched_functions)
 {
     bool success = true;
-    for (const MatchedFunction &matched : matched_functions)
+
+    if (s_threadPool != nullptr)
     {
-        for (size_t i = 0; i < 2; ++i)
+        BS::multi_future<bool> loop_future =
+            s_threadPool->submit_sequence(size_t(0), matched_functions.size(), [&](const size_t i) {
+                return load_source_files_for_matched_function(storage, named_functions_pair, matched_functions[i]);
+            });
+        for (std::future<bool> &future : loop_future)
         {
-            const NamedFunction &named = named_functions_pair[i]->at(matched.named_idx_pair[i]);
-            success &= load_source_file_for_function(storage, named);
+            success &= future.get();
+        }
+    }
+    else
+    {
+        for (const MatchedFunction &matched : matched_functions)
+        {
+            success &= load_source_files_for_matched_function(storage, named_functions_pair, matched);
         }
     }
     return success;
@@ -790,9 +876,24 @@ bool Runner::load_source_files_for_selected_functions(
     span<const IndexT> named_function_indices)
 {
     bool success = true;
-    for (IndexT index : named_function_indices)
+
+    if (s_threadPool != nullptr)
     {
-        success &= load_source_file_for_function(storage, named_functions[index]);
+        BS::multi_future<bool> loop_future =
+            s_threadPool->submit_sequence(size_t(0), named_function_indices.size(), [&](const size_t i) {
+                return load_source_file_for_function(storage, named_functions[named_function_indices[i]]);
+            });
+        for (std::future<bool> &future : loop_future)
+        {
+            success &= future.get();
+        }
+    }
+    else
+    {
+        for (IndexT index : named_function_indices)
+        {
+            success &= load_source_file_for_function(storage, named_functions[index]);
+        }
     }
     return success;
 }
@@ -800,9 +901,24 @@ bool Runner::load_source_files_for_selected_functions(
 bool Runner::load_source_files_for_functions(FileContentStorage &storage, span<NamedFunction> named_functions)
 {
     bool success = true;
-    for (NamedFunction &named : named_functions)
+
+    if (s_threadPool != nullptr)
     {
-        success &= load_source_file_for_function(storage, named);
+        BS::multi_future<bool> loop_future =
+            s_threadPool->submit_sequence(size_t(0), named_functions.size(), [&](const size_t i) {
+                return load_source_file_for_function(storage, named_functions[i]);
+            });
+        for (std::future<bool> &future : loop_future)
+        {
+            success &= future.get();
+        }
+    }
+    else
+    {
+        for (NamedFunction &named : named_functions)
+        {
+            success &= load_source_file_for_function(storage, named);
+        }
     }
     return success;
 }
@@ -824,9 +940,20 @@ void Runner::build_comparison_records_for_matched_functions(
     ConstNamedFunctionsPair named_functions_pair,
     uint32_t lookahead_limit)
 {
-    for (MatchedFunction &matched : matched_functions)
+    if (s_threadPool != nullptr)
     {
-        build_comparison_record(matched, named_functions_pair, lookahead_limit);
+        const BS::multi_future<void> loop_future =
+            s_threadPool->submit_loop(size_t(0), matched_functions.size(), [&](const size_t i) {
+                build_comparison_record(matched_functions[i], named_functions_pair, lookahead_limit);
+            });
+        loop_future.wait();
+    }
+    else
+    {
+        for (MatchedFunction &matched : matched_functions)
+        {
+            build_comparison_record(matched, named_functions_pair, lookahead_limit);
+        }
     }
 }
 
@@ -836,9 +963,23 @@ void Runner::build_comparison_records_for_selected_functions(
     span<const IndexT> matched_function_indices,
     uint32_t lookahead_limit)
 {
-    for (IndexT index : matched_function_indices)
+    if (s_threadPool != nullptr)
     {
-        build_comparison_record(matched_functions[index], named_functions_pair, lookahead_limit);
+        const BS::multi_future<void> loop_future =
+            s_threadPool->submit_loop(size_t(0), matched_function_indices.size(), [&](const size_t i) {
+                build_comparison_record(
+                    matched_functions[matched_function_indices[i]],
+                    named_functions_pair,
+                    lookahead_limit);
+            });
+        loop_future.wait();
+    }
+    else
+    {
+        for (IndexT index : matched_function_indices)
+        {
+            build_comparison_record(matched_functions[index], named_functions_pair, lookahead_limit);
+        }
     }
 }
 

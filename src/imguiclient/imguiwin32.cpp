@@ -55,7 +55,7 @@ ImGuiWin32::~ImGuiWin32()
 {
 }
 
-ImGuiStatus ImGuiWin32::run(const CommandLineOptions &clo)
+ImGuiStatus ImGuiWin32::run(const CommandLineOptions &clo, BS::thread_pool *threadPool)
 {
     // Create application window
     // ImGui_ImplWin32_EnableDpiAwareness();
@@ -107,7 +107,7 @@ ImGuiStatus ImGuiWin32::run(const CommandLineOptions &clo)
     ::ShowWindow(hwnd, SW_MAXIMIZE);
     ::UpdateWindow(hwnd);
 
-    m_app.reset(new ImGuiApp);
+    m_app = std::make_unique<ImGuiApp>(threadPool);
 
     {
         const ImGuiStatus error = m_app->init(clo);

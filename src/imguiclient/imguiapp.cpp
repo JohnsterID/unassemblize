@@ -233,7 +233,7 @@ const std::vector<AssemblerTableColumn> ImGuiApp::s_assemblerTableColumnsRight_N
     AssemblerTableColumn::Bytes,
 };
 
-ImGuiApp::ImGuiApp()
+ImGuiApp::ImGuiApp(BS::thread_pool *threadPool) : m_workQueue(threadPool)
 {
     s_textBuffer1024.reserve(1024);
 }

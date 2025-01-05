@@ -14,12 +14,19 @@
 
 #include "runneroptions.h"
 
+namespace BS
+{
+class thread_pool;
+}
+
 namespace unassemblize
 {
 class Runner
 {
 public:
     Runner() = delete;
+
+    static void set_thread_pool(BS::thread_pool *threadPool);
 
     static std::unique_ptr<Executable> load_exe(const LoadExeOptions &o);
     static std::unique_ptr<PdbReader> load_pdb(const LoadPdbOptions &o);
@@ -125,6 +132,10 @@ private:
         BuildBundleFlags flags);
 
     static void disassemble_function(NamedFunction &named, const FunctionSetup &setup);
+    static void disassemble_matched_function(
+        NamedFunctionsPair named_functions_pair,
+        const MatchedFunction &matched,
+        std::array<const FunctionSetup *, 2> setup_pair);
 
     static void disassemble_matched_functions(
         NamedFunctionsPair named_functions_pair,
@@ -160,6 +171,10 @@ private:
 
     // Note: requires a prior call to build_source_lines_for_functions!
     static bool load_source_file_for_function(FileContentStorage &storage, const NamedFunction &named);
+    static bool load_source_files_for_matched_function(
+        FileContentStorage &storage,
+        ConstNamedFunctionsPair named_functions_pair,
+        const MatchedFunction &matched);
 
     // Note: requires a prior call to build_source_lines_for_functions!
     static bool load_source_files_for_matched_functions(
@@ -203,6 +218,9 @@ private:
         size_t bundle_idx,
         const std::string &bundle_name,
         const std::string &output_file);
+
+private:
+    static BS::thread_pool *s_threadPool;
 };
 
 } // namespace unassemblize

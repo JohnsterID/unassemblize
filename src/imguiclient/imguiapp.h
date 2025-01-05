@@ -27,6 +27,11 @@
 
 struct CommandLineOptions;
 
+namespace BS
+{
+class thread_pool;
+}
+
 namespace unassemblize::gui
 {
 enum class ImGuiStatus
@@ -144,7 +149,7 @@ class ImGuiApp
     };
 
 public:
-    ImGuiApp();
+    explicit ImGuiApp(BS::thread_pool *threadPool = nullptr);
     ~ImGuiApp();
 
     ImGuiStatus init(const CommandLineOptions &clo);

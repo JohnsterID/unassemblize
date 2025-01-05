@@ -123,6 +123,14 @@ FetchContent_Declare(readerwriterqueue
 )
 FetchContent_MakeAvailable(readerwriterqueue)
 
+FetchContent_Declare(
+    bs_thread_pool
+    GIT_REPOSITORY https://github.com/bshoshany/thread-pool.git
+    GIT_TAG        v4.1.0
+    SOURCE_DIR     ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/BS_thread_pool
+)
+FetchContent_MakeAvailable(bs_thread_pool)
+
 # TODO: Can we use FetchContent_MakeAvailable without getting the test suite for it?
 FetchContent_Populate(span DOWNLOAD_EXTRACT_TIMESTAMP
     GIT_REPOSITORY https://github.com/xezon/span
@@ -259,6 +267,7 @@ target_link_libraries(unassemblize PRIVATE
 target_include_directories(unassemblize PRIVATE
     .
     src
+    3rdparty/BS_thread_pool/include
     3rdparty/span/include
 )
 
