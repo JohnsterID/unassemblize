@@ -12,9 +12,9 @@
  */
 #pragma once
 
-#define IMGUI_DEFINE_MATH_OPERATORS
+#include "imguiclient/imguicore.h"
 #include "util/nocopy.h"
-#include <imgui.h>
+
 #include <imgui_internal.h>
 #include <string>
 #include <string_view>

@@ -12,6 +12,7 @@
  */
 #include "imguiwin32.h"
 #include "imguiapp.h"
+#include "imguicore.h"
 
 // Dear ImGui: standalone example application for DirectX 9
 // Learn about Dear ImGui:
@@ -22,7 +23,6 @@
 #include "util.h"
 #include "version.h"
 #include <d3d9.h>
-#include <imgui.h>
 #include <imgui_impl_dx9.h>
 #include <imgui_impl_win32.h>
 #include <tchar.h>

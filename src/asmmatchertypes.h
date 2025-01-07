@@ -15,6 +15,7 @@
 #include "function.h"
 #include <array>
 #include <string>
+#include <type_traits>
 #include <variant>
 #include <vector>
 
@@ -61,10 +62,10 @@ enum class AsmMatchValue
 // Extended match value. Same as the other, but with two more states after mismatch.
 enum class AsmMatchValueEx
 {
-    IsMatch = AsmMatchValue::IsMatch,
-    IsMaybeMatch = AsmMatchValue::IsMaybeMatch,
-    IsMaybeMismatch = AsmMatchValue::IsMaybeMismatch, // Opposite wording, but same meaning.
-    IsMismatch = AsmMatchValue::IsMismatch,
+    IsMatch = static_cast<std::underlying_type_t<AsmMatchValueEx>>(AsmMatchValue::IsMatch),
+    IsMaybeMatch = static_cast<std::underlying_type_t<AsmMatchValueEx>>(AsmMatchValue::IsMaybeMatch),
+    IsMaybeMismatch = IsMaybeMatch, // Opposite wording, but same meaning.
+    IsMismatch = static_cast<std::underlying_type_t<AsmMatchValueEx>>(AsmMatchValue::IsMismatch),
     IsMissingLeft,
     IsMissingRight,
 
@@ -73,6 +74,7 @@ enum class AsmMatchValueEx
 
 inline constexpr std::array<std::string_view, size_t(AsmMatchValueEx::Count)> AsmMatchValueStringArray =
     {"==", "??", "xx", "<<", ">>"};
+
 static_assert(size_t(AsmMatchValueEx::Count) == 5, "Adjust array if this length has changed.");
 static_assert(AsmMatchValueStringArray[0].size() == AsmMatchValueStringArray[1].size(), "Expects same length");
 static_assert(AsmMatchValueStringArray[0].size() == AsmMatchValueStringArray[2].size(), "Expects same length");
