@@ -12,6 +12,7 @@
  */
 #include "imguiwin32.h"
 #include "imguiapp.h"
+#include "imguicore.h"
 
 // Dear ImGui: standalone example application for DirectX 9
 // Learn about Dear ImGui:
@@ -19,12 +20,11 @@
 // - Getting Started      https://dearimgui.com/getting-started
 // - Documentation        https://dearimgui.com/docs (same as your local docs/ folder).
 // - Introduction, links and more at the top of imgui.cpp
-#include "imgui.h"
-#include "imgui_impl_dx9.h"
-#include "imgui_impl_win32.h"
 #include "util.h"
 #include "version.h"
 #include <d3d9.h>
+#include <imgui_impl_dx9.h>
+#include <imgui_impl_win32.h>
 #include <tchar.h>
 
 // Forward declare message handler from imgui_impl_win32.cpp
@@ -55,7 +55,7 @@ ImGuiWin32::~ImGuiWin32()
 {
 }
 
-ImGuiStatus ImGuiWin32::run(const CommandLineOptions &clo)
+ImGuiStatus ImGuiWin32::run(const CommandLineOptions &clo, BS::thread_pool *threadPool)
 {
     // Create application window
     // ImGui_ImplWin32_EnableDpiAwareness();
@@ -107,7 +107,7 @@ ImGuiStatus ImGuiWin32::run(const CommandLineOptions &clo)
     ::ShowWindow(hwnd, SW_MAXIMIZE);
     ::UpdateWindow(hwnd);
 
-    m_app.reset(new ImGuiApp);
+    m_app = std::make_unique<ImGuiApp>(threadPool);
 
     {
         const ImGuiStatus error = m_app->init(clo);
@@ -251,7 +251,12 @@ bool CreateDeviceD3D(HWND hWnd)
     // g_d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;   // Present without vsync, maximum unthrottled
     // framerate
     if (g_pD3D->CreateDevice(
-            D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, hWnd, D3DCREATE_HARDWARE_VERTEXPROCESSING, &g_d3dpp, &g_pd3dDevice)
+            D3DADAPTER_DEFAULT,
+            D3DDEVTYPE_HAL,
+            hWnd,
+            D3DCREATE_HARDWARE_VERTEXPROCESSING,
+            &g_d3dpp,
+            &g_pd3dDevice)
         < 0)
         return false;
 
