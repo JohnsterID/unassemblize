@@ -16,7 +16,6 @@
 #include "functiontypes.h"
 #include "pdbreadertypes.h"
 #include <memory>
-#include <nlohmann/json_fwd.hpp>
 #include <stdio.h>
 
 namespace LIEF
@@ -67,15 +66,18 @@ public:
 
 private:
     ExeSectionInfo *find_section(const std::string &name);
+    void update_sections(const ExeSections &sections);
+    void update_objects(const ExeObjects &objects);
 
-    void load_symbols(nlohmann::json &js, bool overwrite_symbols);
-    void dump_symbols(nlohmann::json &js) const;
+    // JSON handling methods
+    void load_json(const nlohmann::json &js, bool overwrite_symbols);
+    void save_json(nlohmann::json &js) const;
 
-    void load_sections(nlohmann::json &js);
-    void dump_sections(nlohmann::json &js) const;
-
-    void load_objects(nlohmann::json &js);
-    void dump_objects(nlohmann::json &js) const;
+    // JSON section keys
+    static constexpr const char *s_configSection = "config";
+    static constexpr const char *s_symbolsSection = "symbols";
+    static constexpr const char *s_sectionsSection = "sections";
+    static constexpr const char *s_objectsSection = "objects";
 
 private:
     std::string m_exeFilename;
