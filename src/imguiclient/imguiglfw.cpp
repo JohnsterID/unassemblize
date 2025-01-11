@@ -124,10 +124,6 @@ bool ImGuiGLFW::init()
 
     // Configure ImGui
     ImGuiIO &io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-
 #ifdef __APPLE__
     io.ConfigMacOSXBehaviors = true;
 #endif
@@ -202,14 +198,6 @@ bool ImGuiGLFW::update()
         glfwWaitEventsTimeout(0.1);
         return true;
     }
-
-    // Get window info
-    int window_x, window_y;
-    glfwGetWindowPos(m_window, &window_x, &window_y);
-    int width, height;
-    glfwGetFramebufferSize(m_window, &width, &height);
-    m_app->set_window_pos(ImVec2(static_cast<float>(window_x), static_cast<float>(window_y)));
-    m_app->set_window_size(ImVec2(static_cast<float>(width), static_cast<float>(height)));
 
     // Start backend frames
     ImGui_ImplOpenGL3_NewFrame();

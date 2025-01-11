@@ -259,7 +259,8 @@ ImGuiStatus ImGuiApp::init(const CommandLineOptions &clo)
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad; // Enable Gamepad Controls
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable; // Enable Docking
-    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable; // Enable Multi-Viewport / Platform Windows
+    // disable ImGuiConfigFlags_ViewportsEnable so windows stay on top of the main window
+    // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable; // Enable Multi-Viewport / Platform Windows
     // io.ConfigViewportsNoAutoMerge = true;
     // io.ConfigViewportsNoTaskBarIcon = true;
 
@@ -291,12 +292,6 @@ ImGuiStatus ImGuiApp::init(const CommandLineOptions &clo)
 
     // When view ports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
     ImGuiStyle &style = ImGui::GetStyle();
-    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-    {
-        style.WindowRounding = 0.0f;
-        style.Colors[ImGuiCol_WindowBg].w = 1.0f;
-    }
-
     m_workQueue.start();
 
     for (size_t i = 0; i < CommandLineOptions::MAX_INPUT_FILES; ++i)
@@ -1410,8 +1405,6 @@ std::string ImGuiApp::create_time_string(std::chrono::time_point<std::chrono::sy
 
 void ImGuiApp::BackgroundWindow()
 {
-    // #TODO: Make the background dockable somehow. There is a example in ImGui Demo > Examples > Dockspace
-
     // clang-format off
     constexpr ImGuiWindowFlags window_flags =
         ImGuiWindowFlags_NoDecoration |
@@ -1422,15 +1415,33 @@ void ImGuiApp::BackgroundWindow()
         ImGuiWindowFlags_NoDocking;
     // clang-format on
 
+    // Set window position and size to cover the entire viewport
+    ImGuiViewport *viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(viewport->WorkPos);
+    ImGui::SetNextWindowSize(viewport->WorkSize);
+    ImGui::SetNextWindowViewport(viewport->ID);
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+
     bool window_open = true;
-    ImScoped::Window window("main", &window_open, window_flags);
+    ImScoped::Window window("DockSpace", &window_open, window_flags);
+
+    ImGui::PopStyleVar(3);
+
     if (window.IsContentVisible)
     {
-        ImGui::SetWindowPos("main", m_windowPos);
-        ImGui::SetWindowSize("main", ImVec2(m_windowSize.x, 0.f));
+        // Submit the DockSpace
+        ImGuiIO &io = ImGui::GetIO();
+        if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
+        {
+            ImGuiID dockspace_id = ImGui::GetID("DockSpaceId");
+            ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
+        }
 
-        ImScoped::MenuBar menu_bar;
-        if (menu_bar.IsOpen)
+        ImScoped::MenuBar menuBar;
+        if (menuBar.IsOpen)
         {
             {
                 ImScoped::Menu menu("File");
@@ -1468,7 +1479,6 @@ void ImGuiApp::BackgroundWindow()
 void ImGuiApp::FileManagerWindow(bool *p_open)
 {
     ImGui::SetNextWindowSizeConstraints(ImVec2(400, 300), ImVec2(FLT_MAX, FLT_MAX));
-
     ImScoped::Window window("File Manager", p_open, ImGuiWindowFlags_MenuBar);
     if (window.IsContentVisible)
     {
@@ -1533,35 +1543,39 @@ static const std::string g_select_file_dialog_title = "Select File";
 
 void ImGuiApp::FileManagerMenu()
 {
-    if (ImGui::BeginMenuBar())
+    ImScoped::MenuBar menuBar;
+    if (menuBar.IsOpen)
     {
-        if (ImGui::BeginMenu("File"))
         {
-            if (ImGui::MenuItem("Add File"))
+            ImScoped::Menu menu("File");
+            if (menu.IsOpen)
             {
-                add_file();
+                if (ImGui::MenuItem("Add File"))
+                {
+                    add_file();
+                }
+                if (ImGui::MenuItem("Remove All Files"))
+                {
+                    remove_all_files();
+                }
             }
-            if (ImGui::MenuItem("Remove All Files"))
-            {
-                remove_all_files();
-            }
-            ImGui::EndMenu();
         }
 
-        if (ImGui::BeginMenu("View"))
         {
-            ImGui::MenuItem("Show Tabs", nullptr, &m_showFileManagerWithTabs);
-            ImGui::Separator();
-            ImGui::MenuItem("Show Exe Section Info", nullptr, &m_showFileManagerExeSectionInfo);
-            ImGui::MenuItem("Show Exe Symbol Info", nullptr, &m_showFileManagerExeSymbolInfo);
-            ImGui::MenuItem("Show Pdb Compiland Info", nullptr, &m_showFileManagerPdbCompilandInfo);
-            ImGui::MenuItem("Show Pdb Source File Info", nullptr, &m_showFileManagerPdbSourceFileInfo);
-            ImGui::MenuItem("Show Pdb Symbol Info", nullptr, &m_showFileManagerPdbSymbolInfo);
-            ImGui::MenuItem("Show Pdb Function Info", nullptr, &m_showFileManagerPdbFunctionInfo);
-            ImGui::MenuItem("Show Pdb Exe Info", nullptr, &m_showFileManagerPdbExeInfo);
-            ImGui::EndMenu();
+            ImScoped::Menu menu("View");
+            if (menu.IsOpen)
+            {
+                ImGui::MenuItem("Show Tabs", nullptr, &m_showFileManagerWithTabs);
+                ImGui::Separator();
+                ImGui::MenuItem("Show Exe Section Info", nullptr, &m_showFileManagerExeSectionInfo);
+                ImGui::MenuItem("Show Exe Symbol Info", nullptr, &m_showFileManagerExeSymbolInfo);
+                ImGui::MenuItem("Show Pdb Compiland Info", nullptr, &m_showFileManagerPdbCompilandInfo);
+                ImGui::MenuItem("Show Pdb Source File Info", nullptr, &m_showFileManagerPdbSourceFileInfo);
+                ImGui::MenuItem("Show Pdb Symbol Info", nullptr, &m_showFileManagerPdbSymbolInfo);
+                ImGui::MenuItem("Show Pdb Function Info", nullptr, &m_showFileManagerPdbFunctionInfo);
+                ImGui::MenuItem("Show Pdb Exe Info", nullptr, &m_showFileManagerPdbExeInfo);
+            }
         }
-        ImGui::EndMenuBar();
     }
 }
 
