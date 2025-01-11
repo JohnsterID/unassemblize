@@ -18,14 +18,25 @@ endif()
 # Enable JSON compilation database generation
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Symbolic link to the compile_commands.json in root directory for tools
+# Symbolic link to the compile_commands.json in root directory for tools or copy for Windows
 if(CMAKE_EXPORT_COMPILE_COMMANDS)
-    add_custom_target(
-        create_compile_commands_symlink ALL
-        COMMAND ${CMAKE_COMMAND} -E create_symlink 
-            ${CMAKE_BINARY_DIR}/compile_commands.json
-            ${CMAKE_SOURCE_DIR}/compile_commands.json
-    )
+    if(WIN32)
+        # On Windows, instead of creating a symlink, copy the file
+        add_custom_target(
+            create_compile_commands_copy ALL
+            COMMAND ${CMAKE_COMMAND} -E copy 
+                ${CMAKE_BINARY_DIR}/compile_commands.json
+                ${CMAKE_SOURCE_DIR}/compile_commands.json
+        )
+    else()
+        # On non-Windows systems, create the symbolic link
+        add_custom_target(
+            create_compile_commands_symlink ALL
+            COMMAND ${CMAKE_COMMAND} -E create_symlink 
+                ${CMAKE_BINARY_DIR}/compile_commands.json
+                ${CMAKE_SOURCE_DIR}/compile_commands.json
+        )
+    endif()
 endif()
 
 # Platform detection
